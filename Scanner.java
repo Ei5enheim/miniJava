@@ -32,7 +32,7 @@ public class Scanner
     
     }
 
-    public void  scanToken() 
+    public void  scanToken() throws Exception
     {
         StringBuffer buffer = new StringBuffer();
 
@@ -40,13 +40,12 @@ public class Scanner
         {
             if (lookahead) {
                 lookahead = false;
-                if (ch == -1) {
-                    //return EOT token from here
-                    return;
-                }
             } else {
-                if ((ch = in.read()) != -1)
-                    break; //need to add end of input token here.
+                ch = in.read();
+            }
+            if (ch == -1) {
+                //return EOT here.
+                return;
             }
             //need to replace breaks with returns
             switch (ch) {
@@ -139,15 +138,63 @@ public class Scanner
                 case ('/'):
                     System.out.println("dfklgmdfgm");
                     buffer.append(ch);
-                    if ((ch = in.read()) != -1)
-                        
+                    if ((ch = in.read()) == -1) {
+                        //send EOT token here
+                        return;
+                    }
+                    if (ch == '/') {
+                        do {
+                            if ((ch = in.read()) == -1) {
+                                //send EOT token here
+                                return;
+                            }
+                        } while(ch != '\n');
+                        line_num++;
+                    } else if (ch == '*') {
+                        while (true) {
+                            if ((ch = in.read()) == -1) {
+                                //send EOT token here
+                                return;
+                            }
+                            if (ch == '*') {
+                                if ((ch = in.read()) == -1) {
+                                    //send EOT token here.
+                                    return;
+                                }
+                                if (ch == '/') {
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        // send '/' token
+                        return;
+                    }
                     break;
-                 
-
-
-
+                default:
+                    if (Character.isDigit(ch)) {
+                        do {
+                            buffer.append(ch);
+                            if ((ch = in.read()) == -1) {
+                                break; 
+                            }
+                        } while (Character.isDigit(ch));
+                        lookahead = true;
+                        //return num token;
+                    } else if (Character.isLetter(ch)) {
+                        do {
+                            buffer.append(ch);
+                            if ((ch = in.read()) == -1) {
+                                break;
+                            }
+                        } while (Character.isDigit(ch));
+                        lookahead = true;
+                        //return num token;
+                    } else {
+                        System.out.println("undefined character");
+                        //send token error
+                    }
             }    
-
         }
     }
 }  

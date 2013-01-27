@@ -1,4 +1,4 @@
-package miniJava;
+package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
@@ -6,200 +6,182 @@ import java.util.*;
 public class Scanner 
 {
 
-    private InputStreamReader isr;
-    private Reader in;
-    private int ch;
-    private boolean lookahead = false; //this tells us whether we have already read an extra character from input
-    private int line_num = 0;
+    private SourceFile source;
+    private StringBuffer buffer;
+    private char scannedSymbol;
+    private boolean bufferSym;
+    private Keywords keywordsTable;
     
     public Scanner() 
     {
-        super();    
+        bufferSym = true;
     }
     
-    public Scanner(String file) 
+    public Scanner(String fileName) 
     {
-        try 
-        {
-            isr = new InputStreamReader(new FileInputStream(file), "US-ASCII");
-            in = new BufferedReader(isr);
-        } 
-        catch (IOException ioException) 
-        {
-            System.err.println("Error Opening File");
+        source  = new SourceFile(fileName);
+        scannedSymbol = source.scanSymbol();
+        keywordsTable = new Keywords();
+        bufferSym = true;
+    }
+    
+    public Token scanToken()
+    {
+        int kind = -1;
+        Integer obj = null;
+        buffer = new StringBuffer();
+        SourcePosition pos = new SourcePosition(source.getCurrentlineNum());
+        kind = scan();
+        pos.setFinish(source.getCurrentlineNum());
+        if (kind == Keywords.IDENTIFIER)
+            if ((obj = keywordsTable.get(buffer.toString())) != null) {
+                kind = obj.intValue();
         }
-    
+        return (new Token(kind, buffer.toString(), pos));
     }
 
-    public void  scanToken() throws Exception
+    public void acceptSymbol()
     {
-        StringBuffer buffer = new StringBuffer();
+            if (bufferSym)
+                buffer.append(scannedSymbol);
+            scannedSymbol =  source.scanSymbol();
+    }
 
-        while (true)
-        {
-            if (lookahead) {
-                lookahead = false;
-            } else {
-                ch = in.read();
+    public boolean scanComments()
+    {
+        bufferSym = false;
+        if (scannedSymbol == '/') {
+            do {
+                acceptSymbol();
+            } while (scannedSymbol != SourceFile.NEWLINE);
+            acceptSymbol();
+        } else if (scannedSymbol == '*') {
+            while (true) { 
+                acceptSymbol();
+                if (scannedSymbol == '*') {
+                    acceptSymbol();
+                    if (scannedSymbol == '/') {
+                        acceptSymbol();
+                        break;
+                    }
+                }
             }
-            if (ch == -1) {
-                //return EOT here.
-                return;
+        } else {
+            bufferSym = true;
+            return (false);
+        }
+        buffer = new StringBuffer();
+        bufferSym = true;
+        return (true);
+    }
+
+    public void scanWhiteSpaceChars()
+    {
+        if (scannedSymbol == ' ' ||
+            scannedSymbol == '\t'||
+            scannedSymbol == '\n') {
+            bufferSym = false;
+            while (true) {
+                acceptSymbol();
+                if ((scannedSymbol != ' ')  &&
+                    (scannedSymbol != '\t') &&
+                    (scannedSymbol != '\n')) {
+                    break;
+                }
             }
-            //need to replace breaks with returns
-            switch (ch) {
-                case ('\t'):
-                case (' '):
-                    break;
-                case ('\n'):
-                    line_num++;
-                    break;
-                case (']'):
-                    break;
-                case (')'):
-                    break;
-                case('('):
-                    break;
-                case(';'):
-                    break;
-                case ('['):
-                    break;
-                case ('+'):
-                    break;
-                case ('-'):
-                    break;
-                case ('*'):
-                    break;
-                case ('!'):
-                    buffer.append(ch);
-                    if ((ch = in.read()) != -1) {
-                        if (ch == '=') {
-                            buffer.append(ch);
-                            //return the token !=
-                            return;
-                        }
-                    }
-                    lookahead = true;
-                    //return the token !.
-                    return;
-                case ('&'):
-                    buffer.append(ch);
-                    if ((ch = in.read()) != -1) {
-                        if (ch == '&') {
-                            //add the token part.
-                            return;    
-                        }
-                    }
-                    lookahead = true;
-                    //return error token here.
-                    return;
-                case ('|'):
-                    buffer.append(ch);
-                    if ((ch = in.read()) != -1) {
-                        if (ch == '|') {
-                            //add the token part.
-                            return;
-                        }
-                    }
-                    lookahead = true;
-                    //return error token here.
-                    return;
-                case ('>'):
-                    buffer.append(ch);
-                    if ((ch = in.read()) != -1) {
-                        if (ch == '=') {
-                            buffer.append(ch);
-                            //return the token >=
-                            return;
-                        }
-                    }
-                    lookahead = true;
-                    //return the token >
-                    return;
-                case ('<'):
-                    buffer.append(ch);
-                    if ((ch = in.read()) != -1) {
-                        if (ch == '=') {
-                            buffer.append(ch);
-                            //return the token <=
-                            return;
-                        }
-                    }
-                    lookahead = true;
-                    //return the token <
-                    return;
-                case ('='):
-                    buffer.append(ch);
-                    if ((ch = in.read()) != -1) {
-                        if (ch == '=') {
-                            buffer.append(ch);
-                            //return the token ==
-                            return;
-                        }
-                    }
-                    lookahead = true;
-                    //return the token =
-                    return;
-                case ('/'):
-                    System.out.println("dfklgmdfgm");
-                    buffer.append(ch);
-                    if ((ch = in.read()) == -1) {
-                        //send EOT token here
-                        return;
-                    }
-                    if (ch == '/') {
-                        do {
-                            if ((ch = in.read()) == -1) {
-                                //send EOT token here
-                                return;
-                            }
-                        } while(ch != '\n');
-                        line_num++;
-                    } else if (ch == '*') {
-                        while (true) {
-                            if ((ch = in.read()) == -1) {
-                                //send EOT token here
-                                return;
-                            }
-                            if (ch == '*') {
-                                if ((ch = in.read()) == -1) {
-                                    //send EOT token here.
-                                    return;
-                                }
-                                if (ch == '/') {
-                                    break;
-                                }
-                            }
-                        }
-                    } else {
-                        // send '/' token
-                        return;
-                    }
-                    break;
-                default:
-                    if (Character.isDigit(ch)) {
-                        do {
-                            buffer.append(ch);
-                            if ((ch = in.read()) == -1) {
-                                break; 
-                            }
-                        } while (Character.isDigit(ch));
-                        lookahead = true;
-                        //return num token;
-                    } else if (Character.isLetter(ch)) {
-                        do {
-                            buffer.append(ch);
-                            if ((ch = in.read()) == -1) {
-                                break;
-                            }
-                        } while (Character.isDigit(ch) || Character.isLetter(ch));
-                        lookahead = true;
-                        //return num token;
-                    } else {
-                        System.out.println("undefined character");
-                        //send token error
-                    }
+            bufferSym = true;
+        }
+    }
+    
+    public int scan() 
+    {
+        scanWhiteSpaceChars();
+        switch (scannedSymbol) {
+            case ('{'):
+                acceptSymbol();
+                return (Keywords.LCURLY);
+            case ('}'):
+                acceptSymbol();
+                return (Keywords.RCURLY);
+            case (']'):
+                acceptSymbol();
+                return (Keywords.RBRACKET);
+            case (')'):
+                acceptSymbol();
+                return (Keywords.RPAREN);
+            case('('):
+                acceptSymbol();
+                return (Keywords.LPAREN);
+            case(';'):
+                acceptSymbol();
+                return (Keywords.RPAREN);
+            case ('['):
+                acceptSymbol();
+                return (Keywords.LBRACKET);
+            case (','):
+                acceptSymbol();
+                return (Keywords.COMMA);
+            case ('.'):
+                acceptSymbol();
+                return (Keywords.DOT);
+            case ('+'):
+            case ('-'):
+            case ('*'):
+                acceptSymbol();
+                return (Keywords.OPERATOR);
+            case ('/'):
+                acceptSymbol();
+                if (scanComments())
+                    return (scan());
+                else 
+                    return (Keywords.OPERATOR); 
+            case ('&'):
+                acceptSymbol();
+                if (scannedSymbol == '&') {
+                    acceptSymbol();
+                    return (Keywords.OPERATOR);        
+                } else {
+                    return (Keywords.ERROR);
+                }   
+            case ('|'):
+                acceptSymbol();
+                if (scannedSymbol == '|') {
+                    acceptSymbol();
+                    return (Keywords.OPERATOR);      
+                } else {
+                    return (Keywords.ERROR);
+                } 
+            case ('!'):
+            case ('>'):
+            case ('<'):
+            case ('='):
+                acceptSymbol();
+                if (scannedSymbol == '=') {
+                    acceptSymbol();
+                    return (Keywords.OPERATOR);       
+                } else {
+                    return (Keywords.OPERATOR);
+                }
+            case (SourceFile.EOI):
+                return (Keywords.EOT); 
+            default:
+                if (Character.isDigit(scannedSymbol)) {
+                    do {
+                        acceptSymbol();
+                    } while (Character.isDigit(scannedSymbol));
+                    return (Keywords.NUMBER);
+
+                } else if (Character.isLetter(scannedSymbol)) {
+                    do {
+                        acceptSymbol();
+                    } while (Character.isDigit(scannedSymbol) ||
+                             Character.isLetter(scannedSymbol));
+                    return (Keywords.IDENTIFIER); 
+                } else {
+                    acceptSymbol();
+                    System.out.println("undefined character");
+                    return (Keywords.ERROR);
+                }
             }    
         }
-    }
-}  
+    }  

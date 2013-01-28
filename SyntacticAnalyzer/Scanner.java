@@ -36,7 +36,7 @@ public class Scanner
         if (kind == Keywords.IDENTIFIER)
             if ((obj = keywordsTable.get(buffer.toString())) != null) {
                 kind = obj.intValue();
-        }
+            }
         return (new Token(kind, buffer.toString(), pos));
     }
 
@@ -77,20 +77,14 @@ public class Scanner
 
     public void scanWhiteSpaceChars()
     {
-        if (scannedSymbol == ' ' ||
-            scannedSymbol == '\t'||
-            scannedSymbol == '\n') {
-            bufferSym = false;
-            while (true) {
-                acceptSymbol();
-                if ((scannedSymbol != ' ')  &&
-                    (scannedSymbol != '\t') &&
-                    (scannedSymbol != '\n')) {
-                    break;
-                }
-            }
-            bufferSym = true;
-        }
+        bufferSym = false;
+
+        while (scannedSymbol == ' ' ||
+               scannedSymbol == '\t'||
+               scannedSymbol == '\n') 
+            acceptSymbol();
+    
+        bufferSym = true;
     }
     
     public int scan() 
@@ -163,6 +157,7 @@ public class Scanner
                     return (Keywords.OPERATOR);
                 }
             case (SourceFile.EOI):
+                source.close();
                 return (Keywords.EOT); 
             default:
                 if (Character.isDigit(scannedSymbol)) {
@@ -178,8 +173,8 @@ public class Scanner
                              Character.isLetter(scannedSymbol));
                     return (Keywords.IDENTIFIER); 
                 } else {
+                    System.out.println("undefined character,"+ (int)scannedSymbol + "," +scannedSymbol);
                     acceptSymbol();
-                    System.out.println("undefined character");
                     return (Keywords.ERROR);
                 }
             }    

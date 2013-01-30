@@ -18,7 +18,7 @@ public class Parser
         this.lexicalAnalyzer = scanner;
     }
 
-    public boolean match (int tokenID)
+    public boolean match(int tokenID)
     {
         if (currentToken.getKind() == tokenID)
             return (true);
@@ -32,7 +32,7 @@ public class Parser
             System.out.println("Accepting token type:"+ currentToken.getTokenID());
             currentToken = lexicalAnalyzer.scanToken();
         } else {
-            parseError("Expected token" + currentToken.getTokenID() + ", but found token"+ Keywords.tokenTable[tokenID]);
+            parseError("Expected token" + Keywords.tokenTable[tokenID] + ", but found token"+ currentToken.getTokenID());
         }
     }
 
@@ -61,27 +61,26 @@ public class Parser
 
         while (!match(Keywords.RCURLY)) {
             parseDeclarator();
-            parseID();
+            acceptTAndLookahead(Keywords.IDENTIFIER);
             if (match(Keywords.SEMICOLON))
-                acceptTAndLookahead(Keywords.SEMICOLON);
+                acceptTAndLookahead();
             else 
                 parseRestOfMethodDeclaration();
         }
-
+        acceptTAndLookahead(Keywords.RCURLY);
     } 
 
     public void parseDeclarator()
     {
-        switch (currentToken.getKind()) {
-            case (Keywords.PRIVATE):
-            case (Keywords.PUBLIC):
-                acceptTAndLookahead();
-            case (Keywords.STATIC):
-                acceptTAndLookahead();
-            default:
-                parseType();
-        }   
-
+        int kind = currentToken.getKind();
+        if ((kind == Keywords.PRIVATE) ||
+            (kind == Keywords.PUBLIC)) {
+            acceptTAndLookahead();
+            kind = currentToken.getKind();
+        }
+        if ( kind == Keywords.STATIC)
+             acceptTAndLookahead();
+        parseType();
     }
 
     public void parseType()
@@ -98,8 +97,9 @@ public class Parser
             case (Keywords.BOOLEAN):
             case (Keywords.VOID):
                 acceptTAndLookahead();
+                break;
             default:
-                parseError("parseType, unexpected token type" + currentToken.getTokenID());
+                parseError("Method: parseType(), unexpected token type " + currentToken.getTokenID());
 
         }
     }
@@ -130,27 +130,32 @@ public class Parser
                 acceptTAndLookahead();
                 parseExpression();
                 acceptTAndLookahead(Keywords.SEMICOLON);
+                break;
             }   
         }
-        acceptTAndLookahead();
+        acceptTAndLookahead(Keywords.RCURLY);
     } 
 
     public void parseStmt() 
     {
+        System.out.println("In statement");
         int kind = currentToken.getKind();
         acceptTAndLookahead();
         switch (kind) {
             case (Keywords.LCURLY):
                 while (!match(Keywords.RCURLY)) {
                     parseStmt();
+                    System.out.println("in after return Lcurly"); 
                 }
                 acceptTAndLookahead();
                 break;
             case (Keywords.THIS):
-                parseReference();
+                parseIDReference();
+                parseReference(true, false);
                 break;
             case (Keywords.INT):
                 parseBrackets(false);
+                acceptTAndLookahead(Keywords.IDENTIFIER); 
                 parseRestOfAssignmentStmt(); 
                 break;
             case (Keywords.BOOLEAN):
@@ -159,25 +164,53 @@ public class Parser
                 parseRestOfAssignmentStmt(); 
                 break;
             case (Keywords.IDENTIFIER):
-                parseBrackets(false);
-                if (match(Keywords.IDENTIFIER)) {
-                    parseRestOfAssignmentStmt();
+                if (parseIDReference() || match(Keywords.LPAREN)) {
+                    parseReference(true, false);
+                } else if (match(Keywords.LBRACKET)) {
+                    acceptTAndLookahead();
+                    if (match(Keywords.RBRACKET)) {
+                        acceptTAndLookahead();
+                        acceptTAndLookahead(Keywords.IDENTIFIER);
+                        parseRestOfAssignmentStmt();
+                    } else {
+                        parseReference(true, true);
+                        System.out.println("in after return reference");
+                    }
                 } else {
-                    parseReference();
+                    if (match(Keywords.IDENTIFIER)) {
+                        acceptTAndLookahead();
+                        parseRestOfAssignmentStmt();
+                    } else {
+                        parseReference(true, false);
+                    }
                 }
                 break;
             case (Keywords.IF):
                 parseIFStatement();
+                System.out.println("in after return IF");
                 break;
             case (Keywords.WHILE):
                 acceptTAndLookahead(Keywords.LPAREN);
                 parseExpression();
                 acceptTAndLookahead(Keywords.RPAREN);
                 parseStmt();
+                break;
             default:
-                parseError("parseType, unexpected token type" + currentToken.getTokenID());
+                parseError("Method parseStmt(), unexpected token type " + currentToken.getTokenID());
         }
 
+    }
+
+    public boolean parseIDReference()
+    {
+        boolean retValue = false;
+
+        while (match(Keywords.DOT)) {
+            acceptTAndLookahead();
+            acceptTAndLookahead(Keywords.IDENTIFIER);
+            retValue = true;
+        }
+        return (retValue);
     }
 
     public void parseIFStatement()
@@ -192,30 +225,32 @@ public class Parser
         }
     }
 
-    public void parseReference()
+    public void parseReference(boolean isCallFromParseStmt, boolean skip)
     {
-        if (match(Keywords.DOT)) {
-            do {
-                acceptTAndLookahead();
-                acceptTAndLookahead(Keywords.IDENTIFIER);
-            } while (match(Keywords.DOT));
-        }
         if (match(Keywords.LPAREN)) {
             acceptTAndLookahead();
             while (!match(Keywords.RPAREN)) {
                 parseArgumentList();     
             }
             acceptTAndLookahead();
-            acceptTAndLookahead(Keywords.SEMICOLON);
+            if (isCallFromParseStmt)
+                acceptTAndLookahead(Keywords.SEMICOLON);
         } else {
-            if (match(Keywords.LBRACKET)) {
-                acceptTAndLookahead();
+            if (!skip) {
+                if (match(Keywords.LBRACKET)) {
+                    acceptTAndLookahead();    
+                    parseExpression();
+                    acceptTAndLookahead(Keywords.RBRACKET);
+                }
+            } else { 
                 parseExpression();
                 acceptTAndLookahead(Keywords.RBRACKET);
             }
-            acceptTAndLookahead(Keywords.BECOMES);
-            parseExpression();
-            acceptTAndLookahead(Keywords.SEMICOLON); 
+            if (isCallFromParseStmt) {
+                acceptTAndLookahead(Keywords.BECOMES);
+                parseExpression();
+                acceptTAndLookahead(Keywords.SEMICOLON); 
+            }
         }
     }
 
@@ -244,12 +279,13 @@ public class Parser
             if (match(Keywords.RBRACKET))
                 acceptTAndLookahead();
             else
-                parseError("Expecting Unxpectedtokentype:" + currentToken.getTokenID() + " expecting token:"+ Keywords.tokenTable[Keywords.RBRACKET]);  
+                parseError("Method: parseBrackets(), Unxpectedtokentype: " + currentToken.getTokenID() + " expecting token: "+ Keywords.tokenTable[Keywords.RBRACKET]);  
         }
     }
 
     public void parseExpression()
     {
+        System.out.println("In parse Expression");
         int kind;
         while (true) {
             kind = currentToken.getKind();
@@ -257,46 +293,48 @@ public class Parser
             switch (kind) {
             case (Keywords.THIS):
             case (Keywords.IDENTIFIER):
-                parseReference();
+                parseIDReference();
+                parseReference(false, false);
                 break;
             case (Keywords.LPAREN):
                 parseExpression();
+                acceptTAndLookahead(Keywords.RPAREN);
                 break;
             case (Keywords.NUMBER):
             case (Keywords.TRUE):
             case (Keywords.FALSE):
                 break;
             case (Keywords.NEW):
-                acceptTAndLookahead(Keywords.LPAREN);
                 if (match(Keywords.IDENTIFIER)) {
                     acceptTAndLookahead();
                     if (match(Keywords.LPAREN)) {
                         acceptTAndLookahead();
                         acceptTAndLookahead(Keywords.RPAREN);
                     } else if (match(Keywords.LBRACKET)) {
+                        acceptTAndLookahead();
                         parseExpression();
                         acceptTAndLookahead(Keywords.RBRACKET);
                     } else {
-                        parseError("unexpected token:"+ currentToken.getTokenID());
+                        parseError(" Method: parseExpression(), case (NEW (id)**), unexpected token: "+ currentToken.getTokenID());
                     }
                 } else if (match(Keywords.INT)) {
                     acceptTAndLookahead();
                     if (match(Keywords.LBRACKET)) {
+                        acceptTAndLookahead();
                         parseExpression();
                         acceptTAndLookahead(Keywords.RBRACKET);
                     } else {
-                        parseError("unexpected token:"+ currentToken.getTokenID());
+                        parseError("Method: parseExpression(), case (NEW int[]), unexpected token: "+ currentToken.getTokenID());
                     }
                 } else { 
-                    parseError("unexpected token:"+ currentToken.getTokenID());
+                    parseError("Method: parseExpression(), case (NEW xx), unexpected token: "+ currentToken.getTokenID());
                 }
-                acceptTAndLookahead(Keywords.RPAREN);
                 break;
                 default:
-                if (isUnaryOperator()) {
+                if (isUnaryOperator(kind)) {
                     parseExpression();    
                 } else {
-                    parseError("unexpected token:"+ currentToken.getTokenID());
+                    parseError("Method: parseExpression(), case (default), unexpected token: "+ currentToken.getTokenID());
                 }
             }
             if (!isBinaryOperator())
@@ -305,9 +343,8 @@ public class Parser
         }       
     }
 
-    public boolean isUnaryOperator()
+    public boolean isUnaryOperator(int kind)
     {
-        int kind = currentToken.getKind();
         if ((kind == Keywords.NEGATION) ||
             (kind == Keywords.MINUS)) 
             return (true);

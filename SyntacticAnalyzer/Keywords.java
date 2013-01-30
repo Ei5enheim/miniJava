@@ -33,7 +33,7 @@ public class Keywords
     NUMBER  = 0,
     IDENTIFIER  = 1,
     OPERATOR    = 2,
-
+    BECOMES     = 4,
     // reserved words - must be in alphabetical order...
     BOOLEAN       = 3,
     CLASS         = 4,
@@ -68,7 +68,7 @@ public class Keywords
     EOT         = 27,
     ERROR       = 28;
 
-  private static String[] tokenTable = new String[] {
+  public static String[] tokenTable = new String[] {
     "<num>",
     "<identifier>",
     "<operator>",

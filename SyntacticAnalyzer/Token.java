@@ -7,7 +7,7 @@ public final class Token
 {
 
     private int kind;
-    private String tokenId;
+    private String tokenID;
     private SourcePosition pos;
 
     public Token()
@@ -18,17 +18,22 @@ public final class Token
     public Token(int kind, String tokenID, SourcePosition pos) 
     {
         this.kind = kind;
-        this.tokenId = tokenID;
+        this.tokenID = tokenID;
         this.pos = pos;
     }
     
     public String toString ()
     {
-        return (kind + " " + tokenId + " " + pos.getPosition());
+        return (kind + " " + tokenID + " " + pos.getPosition());
     }
     public int getKind() 
     {
         return (kind);
+    }
+    
+    public String getTokenID()
+    {
+        return (tokenID);
     }
 }
 

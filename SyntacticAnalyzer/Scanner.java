@@ -36,7 +36,7 @@ public class Scanner
         if (kind == Keywords.IDENTIFIER)
             if ((obj = keywordsTable.get(buffer.toString())) != null) {
                 kind = obj.intValue();
-        }
+            }
         return (new Token(kind, buffer.toString(), pos));
     }
 

@@ -59,4 +59,18 @@ public class SourceFile
     {
         return currentlineNum;
     }
+    
+    public void close () 
+    {
+        try
+        {
+            in.close();
+            isr.close();
+        }
+        catch (IOException ioException)
+        {
+            System.err.println("error close stream");
+        }
+
+    }
 }

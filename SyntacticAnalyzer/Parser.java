@@ -264,7 +264,7 @@ public class Parser
                 break;
             case (Keywords.NUMBER):
             case (Keywords.TRUE):
-            case (Keywords.FAlSE):
+            case (Keywords.FALSE):
                 break;
             case (Keywords.NEW):
                 acceptTAndLookahead(Keywords.LPAREN);
@@ -277,7 +277,7 @@ public class Parser
                         parseExpression();
                         acceptTAndLookahead(Keywords.RBRACKET);
                     } else {
-                        sytanxError("unexpected token:"+ currentToken.getTokenID());
+                        parseError("unexpected token:"+ currentToken.getTokenID());
                     }
                 } else if (match(Keywords.INT)) {
                     acceptTAndLookahead();
@@ -285,10 +285,10 @@ public class Parser
                         parseExpression();
                         acceptTAndLookahead(Keywords.RBRACKET);
                     } else {
-                        sytanxError("unexpected token:"+ currentToken.getTokenID());
+                        parseError("unexpected token:"+ currentToken.getTokenID());
                     }
                 } else { 
-                    sytanxError("unexpected token:"+ currentToken.getTokenID());
+                    parseError("unexpected token:"+ currentToken.getTokenID());
                 }
                 acceptTAndLookahead(Keywords.RPAREN);
                 break;
@@ -296,7 +296,7 @@ public class Parser
                 if (isUnaryOperator()) {
                     parseExpression();    
                 } else {
-                    sytanxError("unexpected token:"+ currentToken.getTokenID());
+                    parseError("unexpected token:"+ currentToken.getTokenID());
                 }
             }
             if (!isBinaryOperator())
@@ -304,6 +304,24 @@ public class Parser
             acceptTAndLookahead();
         }       
     }
+
+    public boolean isUnaryOperator()
+    {
+        int kind = currentToken.getKind();
+        if ((kind == Keywords.NEGATION) ||
+            (kind == Keywords.MINUS)) 
+            return (true);
+        return (false);
+    }
+    
+    public boolean isBinaryOperator()
+    {
+        int kind = currentToken.getKind();
+        if ((kind >= Keywords.BECOMES) && (kind <= Keywords.NEQUALS)) 
+            return (true);
+        return (false);
+    }
+
 
     public void parseError( String str, boolean exitOnError)
     {

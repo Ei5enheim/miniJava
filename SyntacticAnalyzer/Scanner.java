@@ -114,7 +114,7 @@ public class Scanner
                 return (Keywords.LPAREN);
             case(';'):
                 acceptSymbol();
-                return (Keywords.RPAREN);
+                return (Keywords.SEMICOLON);
             case ('['):
                 acceptSymbol();
                 return (Keywords.LBRACKET);
@@ -125,21 +125,25 @@ public class Scanner
                 acceptSymbol();
                 return (Keywords.DOT);
             case ('+'):
+                acceptSymbol();
+                return (Keywords.PLUS);
             case ('-'):
+                acceptSymbol();
+                return (Keywords.MINUS);
             case ('*'):
                 acceptSymbol();
-                return (Keywords.OPERATOR);
+                return (Keywords.INTO);
             case ('/'):
                 acceptSymbol();
                 if (scanComments())
                     return (scan());
                 else 
-                    return (Keywords.OPERATOR); 
+                    return (Keywords.DIVISION); 
             case ('&'):
                 acceptSymbol();
                 if (scannedSymbol == '&') {
                     acceptSymbol();
-                    return (Keywords.OPERATOR);        
+                    return (Keywords.AND);        
                 } else {
                     return (Keywords.ERROR);
                 }   
@@ -147,20 +151,41 @@ public class Scanner
                 acceptSymbol();
                 if (scannedSymbol == '|') {
                     acceptSymbol();
-                    return (Keywords.OPERATOR);      
+                    return (Keywords.OR);      
                 } else {
                     return (Keywords.ERROR);
                 } 
             case ('!'):
+                acceptSymbol();
+                if (scannedSymbol == '=') {
+                    acceptSymbol();
+                    return (Keywords.NEQUALS);     
+                } else {
+                    return (Keywords.NEGATION);
+                }
             case ('>'):
+                acceptSymbol();
+                if (scannedSymbol == '=') {
+                    acceptSymbol();
+                    return (Keywords.GTHANEQT);     
+                } else {
+                    return (Keywords.GTHAN);
+                }
             case ('<'):
+                acceptSymbol();
+                if (scannedSymbol == '=') {
+                    acceptSymbol();
+                    return (Keywords.LTHANEQT);     
+                } else {
+                    return (Keywords.LTHAN);
+                }
             case ('='):
                 acceptSymbol();
                 if (scannedSymbol == '=') {
                     acceptSymbol();
-                    return (Keywords.OPERATOR);       
+                    return (Keywords.EQUALS);       
                 } else {
-                    return (Keywords.OPERATOR);
+                    return (Keywords.BECOMES);
                 }
             case (SourceFile.EOI):
                 return (Keywords.EOT); 

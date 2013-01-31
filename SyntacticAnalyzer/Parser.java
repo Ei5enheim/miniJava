@@ -1,12 +1,53 @@
+/*
+ * File: Parser.java
+ * Author: Rajesh Gopidi
+ * PID:    720367703
+ * Course : COMP520
+ */
+
 package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
 
+/*
+ * Parser Grammar:
+ *
+ *      Program  ::=  (ClassDeclaration)* eot
+ *      ClassDeclaration  ::= class id {(FieldDeclaration | MethodDeclaration)*}
+ *      FieldDeclaration  ::= Declarators id;
+ *      MethodDeclaration  ::= Declarators id (ParameterList? ) {
+ *                                             Statement* (return Expression ;)? }
+ *      Declarators  ::= (public | private)? static?  Type
+ *      Type  ::=  PrimType |  ClassType  |  ArrType  
+ *      PrimType ::=   int | boolean  | void
+ *      ClassType ::=  id 
+ *      ArrType  ::=  ( int | ClassType ) []
+ *      ParameterList  ::=  Type id (, Type id)*
+ *      ArgumentList  ::=  Expression ( , Expression)*
+ *      Reference  ::=  ( this | id ) ( . id )*
+ *      Statement  ::=  { Statement* }
+ *                      |  Type id = Expression ;
+ *                      |  Reference ([ Expression ])?  = Expression ;
+ *                      |  Reference ( ArgumentList? ) ;
+ *                      |  if ( Expression ) Statement (else Statement)? 
+ *                      |  while ( Expression ) Statement
+ * 
+ *      Expression ::=  Reference ( [ Expression ] )?
+ *                      |  Reference ( ArgumentList? ) 
+ *                      |  unop Expression
+ *                      |  Expression binop Expression
+ *                      |  ( Expression )
+ *                      |  num  | true | false
+ *                      |  new (id ( ) | int [ Expression ]  | id [ Expression ] )
+ *      
+ */         
+
 public class Parser 
 {
-
+    // A variable to reference the current token object.
     Token currentToken;
+    // An object of Scanner class to scan the source file
     Scanner lexicalAnalyzer;
     
     public Parser()
@@ -18,33 +59,69 @@ public class Parser
         this.lexicalAnalyzer = scanner;
     }
 
-    public boolean match(int tokenID)
+    /*
+     * Method match()
+     *
+     * checks if the current token is of the type, which is passed 
+     * as an argument.
+     *
+     * Returns true or false.
+     */
+
+    public boolean match(int kind)
     {
-        if (currentToken.getKind() == tokenID)
+        if (currentToken.getKind() == kind)
             return (true);
         else 
             return (false);
     }
 
-    public void acceptTAndLookahead(int tokenID)
+    /*
+     * Method acceptTAndLookahead(int kind)
+     *
+     * Checks if the current token is of the type, which is passed 
+     * as an argument. If it is, then retrieves next token. 
+     * If it  doesn't match then it exists by throwing an 
+     * an appropriate error.
+     *
+     * Returns void.
+     */
+
+    public void acceptTAndLookahead(int kind)
     {
-        if (match(tokenID)) {
-            System.out.println("Accepting token type:"+ currentToken.getTokenID());
+        if (match(kind)) {
+            System.out.println("Accepting token: "+ currentToken.getTokenID());
             currentToken = lexicalAnalyzer.scanToken();
         } else {
-            parseError("Expected token" + Keywords.tokenTable[tokenID] + ", but found token"+ currentToken.getTokenID());
+            parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
         }
     }
 
+    /*
+     * Method acceptTAndLookahead()
+     *
+     * Retrieves the next token from the source file. 
+     *
+     * Returns void.
+     */
+
     public void acceptTAndLookahead()
     {
-        System.out.println("Accepting token type:"+ currentToken.getTokenID());
+        System.out.println("Accepting token: "+ currentToken.getTokenID());
         currentToken = lexicalAnalyzer.scanToken();
     }
 
+    /*
+     * Method parseFile()
+     *
+     * A call to the method parses the file till EOT
+     * token is encountered.
+     *
+     * Returns void.
+     */
+
     public void parseFile()
     {
-        
         currentToken = lexicalAnalyzer.scanToken();
 
         while (!match(Keywords.EOT)) {
@@ -53,6 +130,14 @@ public class Parser
         System.out.println("Successfully parsed the file");
     }
 
+    /*
+     * Method parseClass()
+     *
+     * A call to the method parses a class definition.
+     *
+     * Returns void.
+     */
+    
     public void parseClass()
     {
         acceptTAndLookahead(Keywords.CLASS);
@@ -60,8 +145,12 @@ public class Parser
         acceptTAndLookahead(Keywords.LCURLY);
 
         while (!match(Keywords.RCURLY)) {
+            // call to Declaration parser
             parseDeclarator();
             acceptTAndLookahead(Keywords.IDENTIFIER);
+            /* check to see if it is method variable declaration or
+             * method definition.
+             */
             if (match(Keywords.SEMICOLON))
                 acceptTAndLookahead();
             else 
@@ -69,6 +158,15 @@ public class Parser
         }
         acceptTAndLookahead(Keywords.RCURLY);
     } 
+
+    /*
+     * Method parseDeclarator()
+     *
+     * This routine parses access identifiers 
+     * and static modifier.
+     *
+     * Returns void.
+     */
 
     public void parseDeclarator()
     {
@@ -82,6 +180,15 @@ public class Parser
              acceptTAndLookahead();
         parseType();
     }
+
+    /*
+     * Method parseType()
+     *
+     * This method parses data/Class/return type 
+     * in variable/method declarations.
+     *  
+     * Returns void. 
+     */    
 
     public void parseType()
     {
@@ -99,19 +206,23 @@ public class Parser
                 acceptTAndLookahead();
                 break;
             default:
-                parseError("Method: parseType(), unexpected token type " + currentToken.getTokenID());
-
+                parseError("Method: parseType(), unexpected token " + currentToken.getTokenID());
         }
     }
 
-    public void parseID()
-    {
-        acceptTAndLookahead(Keywords.IDENTIFIER);
-    }
+    /*
+     * Method parseRestOfMethodDeclaration()
+     *
+     * This method parses method definition excluding 
+     * the return type and method identifier.
+     *  
+     * Returns void. 
+     */
 
     public void parseRestOfMethodDeclaration() 
     {
         acceptTAndLookahead(Keywords.LPAREN);
+        // code below parses the argument list
         if (!match(Keywords.RPAREN)) {
             while (true) {
                 parseType();
@@ -123,6 +234,7 @@ public class Parser
             }
         }
         acceptTAndLookahead(Keywords.RPAREN);
+        // code below parses the body of the method.
         acceptTAndLookahead(Keywords.LCURLY);
         while (!match(Keywords.RCURLY)) {
             parseStmt();
@@ -136,36 +248,49 @@ public class Parser
         acceptTAndLookahead(Keywords.RCURLY);
     } 
 
+    /*
+     * Method parseStmt()
+     *
+     * This method parses a statement inthe
+     * source program.
+     *  
+     * Returns void. 
+     */
+
     public void parseStmt() 
     {
-        System.out.println("In statement");
         int kind = currentToken.getKind();
         acceptTAndLookahead();
         switch (kind) {
             case (Keywords.LCURLY):
                 while (!match(Keywords.RCURLY)) {
                     parseStmt();
-                    System.out.println("in after return Lcurly"); 
                 }
                 acceptTAndLookahead();
                 break;
+            // case for a statement starting with a reference 
             case (Keywords.THIS):
                 parseIDReference();
                 parseReference(true, false);
                 break;
+            // case for a statement which is a variable/field/array defintion 
             case (Keywords.INT):
                 parseBrackets(false);
                 acceptTAndLookahead(Keywords.IDENTIFIER); 
                 parseRestOfAssignmentStmt(); 
                 break;
+            // case for a statement which is a variable/field defintion
             case (Keywords.BOOLEAN):
             case (Keywords.VOID):
                 acceptTAndLookahead(Keywords.IDENTIFIER);
                 parseRestOfAssignmentStmt(); 
                 break;
+            // case for a statement starting with a class identifier
             case (Keywords.IDENTIFIER):
+                // check to see if it is a statement starting with a reference or a method call
                 if (parseIDReference() || match(Keywords.LPAREN)) {
                     parseReference(true, false);
+                // check to see if it is a class declaration.
                 } else if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();
                     if (match(Keywords.RBRACKET)) {
@@ -173,22 +298,27 @@ public class Parser
                         acceptTAndLookahead(Keywords.IDENTIFIER);
                         parseRestOfAssignmentStmt();
                     } else {
+                        // case for a statement starting with an array reference.
                         parseReference(true, true);
                         System.out.println("in after return reference");
                     }
                 } else {
+                    // below code parses definition of a class instance variable.
                     if (match(Keywords.IDENTIFIER)) {
                         acceptTAndLookahead();
                         parseRestOfAssignmentStmt();
                     } else {
+                        // parses a statement which is a reference assignment statement
                         parseReference(true, false);
                     }
                 }
                 break;
+            // case for parsing of IF statement
             case (Keywords.IF):
                 parseIFStatement();
                 System.out.println("in after return IF");
                 break;
+            // case of parsing of WHILE statement
             case (Keywords.WHILE):
                 acceptTAndLookahead(Keywords.LPAREN);
                 parseExpression();
@@ -196,10 +326,20 @@ public class Parser
                 parseStmt();
                 break;
             default:
-                parseError("Method parseStmt(), unexpected token type " + currentToken.getTokenID());
+                parseError("Method parseStmt(), unexpected token " + currentToken.getTokenID());
         }
 
     }
+
+    /*
+     * Method parseIDReference()
+     *
+     * This method parses a part of a statement 
+     * which accesses a field/method of an object
+     * 
+     * Returns true, if the statement includes a reference to a
+     * field/method of an object. In other cases, it returns false.
+     */
 
     public boolean parseIDReference()
     {
@@ -225,6 +365,15 @@ public class Parser
         }
     }
 
+    /*
+     * Method parseReference()
+     *
+     * This method parses a part of a statement 
+     * which is a call to method of an object or an 
+     * assignment of a value to a memeber of an array.
+     * 
+     */
+
     public void parseReference(boolean isCallFromParseStmt, boolean skip)
     {
         if (match(Keywords.LPAREN)) {
@@ -233,9 +382,11 @@ public class Parser
                 parseArgumentList();     
             }
             acceptTAndLookahead();
+            // check to see if a statement or an expression needs to be parsed
             if (isCallFromParseStmt)
                 acceptTAndLookahead(Keywords.SEMICOLON);
         } else {
+            // skips the check if it is already done by the callee
             if (!skip) {
                 if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();    
@@ -246,6 +397,7 @@ public class Parser
                 parseExpression();
                 acceptTAndLookahead(Keywords.RBRACKET);
             }
+            // check to see if a statement or an expression needs to be parsed
             if (isCallFromParseStmt) {
                 acceptTAndLookahead(Keywords.BECOMES);
                 parseExpression();
@@ -254,16 +406,32 @@ public class Parser
         }
     }
 
+    /*
+     * Method parseArgumentList()
+     *
+     * This method parses a list of arguments 
+     * in a method call.
+     * 
+     */
+
     public void parseArgumentList()
     {
         parseExpression();
-        if (match(Keywords.COMMA)) {
-            do {
-                acceptTAndLookahead();
-                parseExpression();
-            } while (match(Keywords.COMMA));
+        while (match(Keywords.COMMA)) {
+            acceptTAndLookahead();
+            parseExpression();
         }
     }
+
+    /*
+     * Method parseRestOfAssignmentStmt()
+     *
+     * This method parses an assignment  
+     * statement starting from equal to
+     * symbol.
+     * 
+     */
+
 
     public void parseRestOfAssignmentStmt()
     {
@@ -272,6 +440,14 @@ public class Parser
         acceptTAndLookahead(Keywords.SEMICOLON);
     }
 
+    /*
+     * Method parseBrackets()
+     *
+     * This method parses square brackets within an   
+     * array declaration/definition.
+     * 
+     */
+ 
     public void parseBrackets(boolean exitOnError)
     {
         if (match(Keywords.LBRACKET)) {
@@ -279,23 +455,36 @@ public class Parser
             if (match(Keywords.RBRACKET))
                 acceptTAndLookahead();
             else
-                parseError("Method: parseBrackets(), Unxpectedtokentype: " + currentToken.getTokenID() + " expecting token: "+ Keywords.tokenTable[Keywords.RBRACKET]);  
+                parseError("Method: parseBrackets(), Unxpectedtokentype: " + 
+                           currentToken.getTokenID() + " expecting token: "+ 
+                           Keywords.tokenTable[Keywords.RBRACKET]);  
         }
     }
 
+    /*
+     * Method parseExpression()
+     *
+     * This method parses an expression within  
+     * a statement.
+     * 
+     */
+
     public void parseExpression()
     {
-        System.out.println("In parse Expression");
         int kind;
         while (true) {
             kind = currentToken.getKind();
             acceptTAndLookahead();
             switch (kind) {
+            /* case for an expression which is a 
+             * method call / reference to an array element
+             */
             case (Keywords.THIS):
             case (Keywords.IDENTIFIER):
                 parseIDReference();
                 parseReference(false, false);
                 break;
+            // case for expression of the form (expr)
             case (Keywords.LPAREN):
                 parseExpression();
                 acceptTAndLookahead(Keywords.RPAREN);
@@ -304,7 +493,9 @@ public class Parser
             case (Keywords.TRUE):
             case (Keywords.FALSE):
                 break;
+            // case for an expression of the "new ..."
             case (Keywords.NEW):
+                // id () | id [expr]
                 if (match(Keywords.IDENTIFIER)) {
                     acceptTAndLookahead();
                     if (match(Keywords.LPAREN)) {
@@ -315,8 +506,10 @@ public class Parser
                         parseExpression();
                         acceptTAndLookahead(Keywords.RBRACKET);
                     } else {
-                        parseError(" Method: parseExpression(), case (NEW (id)**), unexpected token: "+ currentToken.getTokenID());
+                        parseError(" Method: parseExpression(), case (NEW (id)**), unexpected token: "
+                                   + currentToken.getTokenID());
                     }
+                    // int [expression]
                 } else if (match(Keywords.INT)) {
                     acceptTAndLookahead();
                     if (match(Keywords.LBRACKET)) {
@@ -324,19 +517,24 @@ public class Parser
                         parseExpression();
                         acceptTAndLookahead(Keywords.RBRACKET);
                     } else {
-                        parseError("Method: parseExpression(), case (NEW int[]), unexpected token: "+ currentToken.getTokenID());
+                        parseError("Method: parseExpression(), case (NEW int[]), unexpected token: "
+                                   + currentToken.getTokenID());
                     }
                 } else { 
-                    parseError("Method: parseExpression(), case (NEW xx), unexpected token: "+ currentToken.getTokenID());
+                    parseError("Method: parseExpression(), case (NEW xx), unexpected token: "
+                               + currentToken.getTokenID());
                 }
-                break;
+                break;  
+                // a case for an expression of the form unop expr
+                case (Keywords.NEGATION):
+                case (Keywords.MINUS):
+                    parseExpression();
+                    break;
                 default:
-                if (isUnaryOperator(kind)) {
-                    parseExpression();    
-                } else {
-                    parseError("Method: parseExpression(), case (default), unexpected token: "+ currentToken.getTokenID());
-                }
+                    parseError("Method: parseExpression(), case (default), unexpected token: "
+                               + currentToken.getTokenID());
             }
+            // check to see if the expression is of the form expr * expr
             if (!isBinaryOperator())
                 break;
             acceptTAndLookahead();
@@ -362,14 +560,14 @@ public class Parser
 
     public void parseError( String str, boolean exitOnError)
     {
-        System.out.println("Parse Error " + str);
+        System.out.println("Parse Error, " + str);
         if (exitOnError)
             System.exit(4);
     }
 
     public void parseError( String str) 
     {
-        System.out.println("Parse Error " + str);
+        System.out.println("Parse Error, " + str);
         System.exit(4);
     }
 }

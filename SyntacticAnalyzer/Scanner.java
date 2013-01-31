@@ -1,15 +1,47 @@
+/*
+ * File: Scanner.java
+ * Author: Rajesh Gopidi
+ * PID:    720367703
+ * Course : COMP520
+ */
+
+/*
+ *  Scanner  
+ *
+ * Grammar:
+ *      
+ *   num ::= digit digit*
+ *    id  ::= sym(sym | digit)*
+ *   digit ::= '0' | ... | '9'
+ *   sym   :: = [a-zA-Z]
+ *   op ::= '+' | '*' | '-' | '/' | "&&" | "||" | '>' | 
+ *          '<' | "<=" | ">=" | '!' | "!=" | "==" | '='
+ *
+ */
+
 package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
 
+/*
+ * Class: Scanner
+ *
+ * This class defines methods that parse the input file based on the grammar stated above. 
+ *
+ */
+
 public class Scanner 
 {
-
+    // Object to read the input file
     private SourceFile source;
+    // Buffer to store the parsed characters
     private StringBuffer buffer;
+    // holds the currently scanned symbol
     private char scannedSymbol;
+    // variable to turn on/off the buffer
     private boolean bufferSym;
+    // Table that holds the keywords and their token identifiers
     private Keywords keywordsTable;
     
     public Scanner() 
@@ -19,27 +51,52 @@ public class Scanner
     
     public Scanner(String fileName) 
     {
+        // opening the file
         source  = new SourceFile(fileName);
         scannedSymbol = source.scanSymbol();
+        // call to initiate the keywords table.
         keywordsTable = new Keywords();
         bufferSym = true;
     }
     
+    /*
+     * Method: scanToken
+     *
+     * This routine scans the input file from where it left off last time
+     * return a Token object to the caller. 
+     *
+     */
     public Token scanToken()
     {
         int kind = -1;
         Integer obj = null;
         buffer = new StringBuffer();
+        // retrieving the line number of the current token in the source file
         SourcePosition pos = new SourcePosition(source.getCurrentlineNum());
+        // calling the scanner to scan the input file.
         kind = scan();
         pos.setFinish(source.getCurrentlineNum());
+        /* 
+         * if the token is an Identifier then we check if it is a key word by
+         * searching the Keywords table.
+         *
+         */
         if (kind == Keywords.IDENTIFIER)
             if ((obj = keywordsTable.get(buffer.toString())) != null) {
                 kind = obj.intValue();
             }
+        // if EOF is reached then it returns the token, '$' 
+        if (kind == Keywords.EOT)
+            buffer.append('$');
         return (new Token(kind, buffer.toString(), pos));
     }
-
+    /* 
+     * Method: acceptSymbol()
+     * 
+     * Reads the next from the source file after appending the
+     * current symbol to the string in the buffer. 
+     *
+     */
     public void acceptSymbol()
     {
             if (bufferSym)
@@ -47,14 +104,26 @@ public class Scanner
             scannedSymbol =  source.scanSymbol();
     }
 
+    /*
+     *  Method: scanComments()
+     *
+     *  This method skips through all the comments encountered and exits when a 
+     *  non-comment symbol is encountered.
+     *  First, it checks for symbols "//" or "/*" and scans through the file until it encounters 
+     *  a '\n' character or "'*'/" symbol respectively. The method flushes the buffer before 
+     *  returning.
+     *  At any stage, if it encounters EOF, then it stops executing and returns.     
+     */
+
     public boolean scanComments()
     {
         bufferSym = false;
         if (scannedSymbol == '/') {
             do {
                 acceptSymbol();
-            } while (scannedSymbol != SourceFile.NEWLINE);
-            acceptSymbol();
+            } while ((scannedSymbol != SourceFile.NEWLINE) && (scannedSymbol != SourceFile.EOI));
+            if (scannedSymbol != SourceFile.EOI)
+                acceptSymbol();
         } else if (scannedSymbol == '*') {
             while (true) { 
                 acceptSymbol();
@@ -63,7 +132,11 @@ public class Scanner
                     if (scannedSymbol == '/') {
                         acceptSymbol();
                         break;
+                    } else if (scannedSymbol == SourceFile.EOI) {
+                        break;
                     }
+                } else if (scannedSymbol == SourceFile.EOI) {
+                    break;
                 }
             }
         } else {
@@ -75,24 +148,35 @@ public class Scanner
         return (true);
     }
 
+    /*
+     * Method: scanWhiteSpaceChars() 
+     *
+     *  This method discards all the whitespace characters 
+     *  encountered in the source file.
+     */
+
     public void scanWhiteSpaceChars()
     {
-        if (scannedSymbol == ' ' ||
-            scannedSymbol == '\t'||
-            scannedSymbol == '\n') {
-            bufferSym = false;
-            while (true) {
-                acceptSymbol();
-                if ((scannedSymbol != ' ')  &&
-                    (scannedSymbol != '\t') &&
-                    (scannedSymbol != '\n')) {
-                    break;
-                }
-            }
-            bufferSym = true;
+        bufferSym = false;
+        while (scannedSymbol == ' ' ||
+               scannedSymbol == '\t'||
+               scannedSymbol == '\r'||
+               scannedSymbol == '\n') {
+               acceptSymbol();
         }
+        bufferSym = true;
     }
-    
+   
+    /*
+     * Method: scan()
+     *
+     * This function scans through the input file one symbol
+     * at a time [ignores whitespace characters and comments].
+     * It exits  when a valid token is accumulated in the buffer
+     * or EOF is encountered.
+     *
+     * Returns token type.
+     */ 
     public int scan() 
     {
         scanWhiteSpaceChars();

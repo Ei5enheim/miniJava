@@ -1,3 +1,10 @@
+/*
+ * File: Keywords.java
+ * Author: Rajesh Gopidi
+ * PID:    720367703
+ * Course : COMP520
+ */
+
 package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
@@ -5,22 +12,32 @@ import java.util.*;
 
 public class Keywords 
 {
-
+    // A Hashtable object to store the keywords 
     private final Hashtable<String, Integer> keywords;
 
     public Keywords()
     {
+        // Initiating the Hashtable
         keywords = new Hashtable<String, Integer>();
+        // call to add the keywords to the Hashtable.
         addKeywords();
     }
     
     private void addKeywords() 
     {
+        /* runs through an array of String objects and 
+         * adds them to the Hashtable.
+         */
         for (int i = BOOLEAN; i <= WHILE; i++) {
             keywords.put(tokenTable[i], new Integer(i));
         }
     }
-    
+    /*
+     * Method get
+     *
+     * Returns the key of a particular token spelling 
+     *
+     */ 
     public Integer get(String str)
     {
         return (keywords.get(str));
@@ -122,7 +139,7 @@ public class Keywords
     "]",
     "{",
     "}",
-    "<error>",
-    "$"
+    "$",
+    "<error>"
   };
 }

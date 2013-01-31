@@ -1,8 +1,23 @@
+/*
+ * File: Token.java
+ * Author: Rajesh Gopidi
+ * PID:    720367703
+ * Course : COMP520
+ */
+
 package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
 
+/*
+ * Class Token
+ *
+ * Objects of this class hold the attributes of a token
+ * such as token type [keyword, id, num etc], ID [spelling of
+ * the token] and position of the token.
+ *
+ */
 public final class Token 
 {
 

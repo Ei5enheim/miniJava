@@ -23,7 +23,7 @@ package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
-
+import miniJava.SyntacticAnalyzer.*;
 /*
  * Class: Scanner
  *

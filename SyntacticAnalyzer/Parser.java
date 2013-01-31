@@ -9,7 +9,7 @@ package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
-
+import miniJava.SyntacticAnalyzer.*;
 /*
  * Parser Grammar:
  *
@@ -90,7 +90,7 @@ public class Parser
     public void acceptTAndLookahead(int kind)
     {
         if (match(kind)) {
-            System.out.println("Accepting token: "+ currentToken.getTokenID());
+            //System.out.println("Accepting token: "+ currentToken.getTokenID());
             currentToken = lexicalAnalyzer.scanToken();
         } else {
             parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
@@ -107,7 +107,7 @@ public class Parser
 
     public void acceptTAndLookahead()
     {
-        System.out.println("Accepting token: "+ currentToken.getTokenID());
+        //System.out.println("Accepting token: "+ currentToken.getTokenID());
         currentToken = lexicalAnalyzer.scanToken();
     }
 
@@ -300,7 +300,6 @@ public class Parser
                     } else {
                         // case for a statement starting with an array reference.
                         parseReference(true, true);
-                        System.out.println("in after return reference");
                     }
                 } else {
                     // below code parses definition of a class instance variable.
@@ -316,7 +315,6 @@ public class Parser
             // case for parsing of IF statement
             case (Keywords.IF):
                 parseIFStatement();
-                System.out.println("in after return IF");
                 break;
             // case of parsing of WHILE statement
             case (Keywords.WHILE):
@@ -558,14 +556,14 @@ public class Parser
     }
 
 
-    public void parseError( String str, boolean exitOnError)
+    public void parseError(String str, boolean exitOnError)
     {
         System.out.println("Parse Error, " + str);
         if (exitOnError)
             System.exit(4);
     }
 
-    public void parseError( String str) 
+    public void parseError(String str) 
     {
         System.out.println("Parse Error, " + str);
         System.exit(4);

@@ -8,6 +8,7 @@
 package miniJava.SyntacticAnalyzer;
 import java.io.*;
 import java.util.*;
+import miniJava.SyntacticAnalyzer.*;
 
 public class SourceFile
 {
@@ -48,6 +49,7 @@ public class SourceFile
             System.err.println("Error Opening File");
             isr = null;
             in = null;
+            System.exit(4);
         }
 
     }

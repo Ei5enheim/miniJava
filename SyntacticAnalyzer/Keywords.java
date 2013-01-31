@@ -9,7 +9,7 @@ package miniJava.SyntacticAnalyzer;
 
 import java.io.*;
 import java.util.*;
-
+import miniJava.SyntacticAnalyzer.*;
 public class Keywords 
 {
     // A Hashtable object to store the keywords 

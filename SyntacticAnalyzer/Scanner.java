@@ -11,7 +11,7 @@
  * Grammar:
  *      
  *   num ::= digit digit*
- *    id  ::= sym(sym | digit)*
+ *   id  ::= sym(sym | digit)*
  *   digit ::= '0' | ... | '9'
  *   sym   :: = [a-zA-Z]
  *   op ::= '+' | '*' | '-' | '/' | "&&" | "||" | '>' | 
@@ -88,6 +88,7 @@ public class Scanner
         // if EOF is reached then it returns the token, '$' 
         if (kind == Keywords.EOT)
             buffer.append('$');
+        //System.out.println("returning token: " + buffer.toString());
         return (new Token(kind, buffer.toString(), pos));
     }
     /* 
@@ -101,6 +102,7 @@ public class Scanner
     {
             if (bufferSym)
                 buffer.append(scannedSymbol);
+            //System.out.println("Accepted symbol" + scannedSymbol);
             scannedSymbol =  source.scanSymbol();
     }
 
@@ -125,8 +127,10 @@ public class Scanner
             if (scannedSymbol != SourceFile.EOI)
                 acceptSymbol();
         } else if (scannedSymbol == '*') {
+            acceptSymbol();
             while (true) { 
-                acceptSymbol();
+                //System.out.println("scanned symbol" + scannedSymbol);
+                //acceptSymbol();
                 if (scannedSymbol == '*') {
                     acceptSymbol();
                     if (scannedSymbol == '/') {
@@ -137,6 +141,8 @@ public class Scanner
                     }
                 } else if (scannedSymbol == SourceFile.EOI) {
                     break;
+                } else {
+                    acceptSymbol();
                 }
             }
         } else {
@@ -284,7 +290,8 @@ public class Scanner
                     do {
                         acceptSymbol();
                     } while (Character.isDigit(scannedSymbol) ||
-                             Character.isLetter(scannedSymbol));
+                             Character.isLetter(scannedSymbol)||
+                             scannedSymbol == '_');
                     return (Keywords.IDENTIFIER); 
                 } else {
                     acceptSymbol();

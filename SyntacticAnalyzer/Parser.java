@@ -90,7 +90,7 @@ public class Parser
     public void acceptTAndLookahead(int kind)
     {
         if (match(kind)) {
-            //System.out.println("Accepting token: "+ currentToken.getTokenID());
+            System.out.println("Accepting token: "+ currentToken.getTokenID());
             currentToken = lexicalAnalyzer.scanToken();
         } else {
             parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
@@ -107,7 +107,7 @@ public class Parser
 
     public void acceptTAndLookahead()
     {
-        //System.out.println("Accepting token: "+ currentToken.getTokenID());
+        System.out.println("Accepting token: "+ currentToken.getTokenID());
         currentToken = lexicalAnalyzer.scanToken();
     }
 
@@ -237,12 +237,13 @@ public class Parser
         // code below parses the body of the method.
         acceptTAndLookahead(Keywords.LCURLY);
         while (!match(Keywords.RCURLY)) {
-            parseStmt();
             if (match(Keywords.RETURN)) {
                 acceptTAndLookahead();
                 parseExpression();
                 acceptTAndLookahead(Keywords.SEMICOLON);
                 break;
+            } else {
+                parseStmt();
             }   
         }
         acceptTAndLookahead(Keywords.RCURLY);
@@ -550,7 +551,7 @@ public class Parser
     public boolean isBinaryOperator()
     {
         int kind = currentToken.getKind();
-        if ((kind >= Keywords.BECOMES) && (kind <= Keywords.NEQUALS)) 
+        if ((kind >= Keywords.PLUS) && (kind <= Keywords.NEQUALS)) 
             return (true);
         return (false);
     }

@@ -88,6 +88,8 @@ public class Scanner
         // if EOF is reached then it returns the token, '$' 
         if (kind == Keywords.EOT)
             buffer.append('$');
+        else if (kind == Keywords.ERROR_COMMENTS)
+            buffer.append("undisclosed comments");
         //System.out.println("returning token: " + buffer.toString());
         return (new Token(kind, buffer.toString(), pos));
     }
@@ -117,15 +119,18 @@ public class Scanner
      *  At any stage, if it encounters EOF, then it stops executing and returns.     
      */
 
-    public boolean scanComments()
+    public int scanComments()
     {
         bufferSym = false;
         if (scannedSymbol == '/') {
             do {
                 acceptSymbol();
             } while ((scannedSymbol != SourceFile.NEWLINE) && (scannedSymbol != SourceFile.EOI));
-            if (scannedSymbol != SourceFile.EOI)
+            if (scannedSymbol == SourceFile.EOI) {
+                return (2);
+            } else {
                 acceptSymbol();
+            }
         } else if (scannedSymbol == '*') {
             acceptSymbol();
             while (true) { 
@@ -137,21 +142,21 @@ public class Scanner
                         acceptSymbol();
                         break;
                     } else if (scannedSymbol == SourceFile.EOI) {
-                        break;
+                        return (2);
                     }
                 } else if (scannedSymbol == SourceFile.EOI) {
-                    break;
+                    return (2);
                 } else {
                     acceptSymbol();
                 }
             }
         } else {
             bufferSym = true;
-            return (false);
+            return (0);
         }
         buffer = new StringBuffer();
         bufferSym = true;
-        return (true);
+        return (1);
     }
 
     /*
@@ -225,10 +230,13 @@ public class Scanner
                 return (Keywords.INTO);
             case ('/'):
                 acceptSymbol();
-                if (scanComments())
+                int rv = scanComments();
+                if (rv == 1)
                     return (scan());
+                else if (rv == 0)
+                    return (Keywords.DIVISION);
                 else 
-                    return (Keywords.DIVISION); 
+                    return (Keywords.ERROR_COMMENTS); 
             case ('&'):
                 acceptSymbol();
                 if (scannedSymbol == '&') {

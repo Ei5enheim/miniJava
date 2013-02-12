@@ -74,7 +74,7 @@ public class Scanner
         // retrieving the line number of the current token in the source file
         SourcePosition pos = new SourcePosition(source.getCurrentlineNum());
         // calling the scanner to scan the input file.
-        kind = scan();
+        kind = scan(false);
         pos.setFinish(source.getCurrentlineNum());
         /* 
          * if the token is an Identifier then we check if it is a key word by
@@ -93,6 +93,35 @@ public class Scanner
         //System.out.println("returning token: " + buffer.toString());
         return (new Token(kind, buffer.toString(), pos));
     }
+
+    public Token scanToken(boolean scanWhitespace)
+    {
+        int kind = -1;
+        Integer obj = null;
+        buffer = new StringBuffer();
+        // retrieving the line number of the current token in the source file
+        SourcePosition pos = new SourcePosition(source.getCurrentlineNum());
+        // calling the scanner to scan the input file.
+        kind = scan(scanWhitespace);
+        pos.setFinish(source.getCurrentlineNum());
+        /* 
+         * if the token is an Identifier then we check if it is a key word by
+         * searching the Keywords table.
+         *
+         */
+        if (kind == Keywords.IDENTIFIER)
+            if ((obj = keywordsTable.get(buffer.toString())) != null) {
+                kind = obj.intValue();
+            }
+        // if EOF is reached then it returns the token, '$' 
+        if (kind == Keywords.EOT)
+            buffer.append('$');
+        else if (kind == Keywords.ERROR_COMMENTS)
+            buffer.append("undisclosed comments");
+        //System.out.println("returning token: " + buffer.toString());
+        return (new Token(kind, buffer.toString(), pos));
+    }
+
     /* 
      * Method: acceptSymbol()
      * 
@@ -166,16 +195,19 @@ public class Scanner
      *  encountered in the source file.
      */
 
-    public void scanWhiteSpaceChars()
+    public boolean scanWhiteSpaceChars()
     {
         bufferSym = false;
+        boolean rv = false;
         while (scannedSymbol == ' ' ||
                scannedSymbol == '\t'||
                scannedSymbol == '\r'||
                scannedSymbol == '\n') {
-               acceptSymbol();
+            acceptSymbol();
+            rv = true;
         }
         bufferSym = true;
+        return (rv);
     }
    
     /*
@@ -188,9 +220,14 @@ public class Scanner
      *
      * Returns token type.
      */ 
-    public int scan() 
+    public int scan(boolean scanWhitespace) 
     {
-        scanWhiteSpaceChars();
+        boolean return_val;
+        return_val = scanWhiteSpaceChars(); 
+        if (scanWhitespace) {
+            if (return_val)
+                return (Keywords.WHITESPACE);
+        } 
         switch (scannedSymbol) {
             case ('{'):
                 acceptSymbol();
@@ -232,7 +269,7 @@ public class Scanner
                 acceptSymbol();
                 int rv = scanComments();
                 if (rv == 1)
-                    return (scan());
+                    return (scan(false));
                 else if (rv == 0)
                     return (Keywords.DIVISION);
                 else 

@@ -49,7 +49,7 @@ public class Parser
     Token currentToken;
     // An object of Scanner class to scan the source file
     Scanner lexicalAnalyzer;
-    
+    boolean debug = true; 
     public Parser()
     {
     }
@@ -94,6 +94,17 @@ public class Parser
             currentToken = lexicalAnalyzer.scanToken();
         } else {
             parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
+        }
+    }
+
+    public boolean acceptTAndLookahead(boolean scanWhitespace)
+    {
+        System.out.println("Accepting token: "+ currentToken.getTokenID());
+        currentToken = lexicalAnalyzer.scanToken(scanWhitespace);
+        if (currentToken.getKind() == Keywords.WHITESPACE) {
+            return (true);
+        } else {
+            return (false);
         }
     }
 
@@ -470,74 +481,162 @@ public class Parser
 
     public void parseExpression()
     {
-        int kind;
+        System.out.println("In parse expression");
+        parseExpressionL1();
+        while (match(Keywords.OR)) {
+           acceptTAndLookahead();
+           parseExpressionL1();
+        }
+    }
+
+    public void parseExpressionL1() 
+    {
+        if (debug)
+            System.out.println("In parse expressionL1");
+        parseExpressionL2();
+        while (match(Keywords.AND)) {
+           acceptTAndLookahead();
+           parseExpressionL2();
+        }
+    }
+
+    public void parseExpressionL2()
+    {
+        if (debug)
+            System.out.println("In parse expressionL2");
+        parseExpressionL3();
+        while (match(Keywords.EQUALS) ||
+               match(Keywords.NEQUALS)) {
+           acceptTAndLookahead();
+           parseExpressionL3();
+        }
+    }
+
+    public void parseExpressionL3()
+    {
+        if (debug)
+            System.out.println("In parse expressionL3");
+        parseExpressionL4();
+        while (match(Keywords.GTHAN) ||
+               match(Keywords.LTHAN) ||
+               match(Keywords.GTHANEQT) ||
+               match(Keywords.LTHANEQT)) {
+           acceptTAndLookahead();
+           parseExpressionL4();
+        }
+    }   
+
+    public void parseExpressionL4()
+    {
+        if (debug)
+            System.out.println("In parse expressionL4");
+        parseExpressionL5();
+        while (match(Keywords.PLUS) ||
+               match(Keywords.MINUS)) {
+           acceptTAndLookahead();
+           parseExpressionL5();
+        }
+    }   
+
+    public void parseExpressionL5()
+    {
+        if (debug)
+            System.out.println("In parse expressionL5");
+        parseExpressionL6();
+        while (match(Keywords.DIVISION) ||
+               match(Keywords.INTO)) {
+           acceptTAndLookahead();
+           parseExpressionL6();
+        }
+    }
+
+    public void parseExpressionL6()
+    {
+        if (debug)
+            System.out.println("In parse expressionL6");
+        int kind = -1;
+        boolean foundWhitespace = true;
         while (true) {
             kind = currentToken.getKind();
-            acceptTAndLookahead();
-            switch (kind) {
+            if ((kind == Keywords.MINUS) &&
+                foundWhitespace) {
+                foundWhitespace = acceptTAndLookahead(true);
+                if  (foundWhitespace) {
+                    acceptTAndLookahead();
+                }
+            } else if (kind == Keywords.NEGATION) {
+                acceptTAndLookahead();
+                foundWhitespace = true;
+            } else {
+                break;
+            }
+        }
+        parseIDsInExpression();
+    }
+
+    public void parseIDsInExpression()
+    {
+        if (debug)
+            System.out.println("In parseIDsInExpression");
+        int kind;
+        kind = currentToken.getKind();
+        System.out.print("beforehand ");
+        acceptTAndLookahead();
+        switch (kind) {
             /* case for an expression which is a 
              * method call / reference to an array element
              */
-            case (Keywords.THIS):
-            case (Keywords.IDENTIFIER):
-                parseIDReference();
-                parseReference(false, false);
-                break;
+        case (Keywords.THIS):
+        case (Keywords.IDENTIFIER):
+            parseIDReference();
+            parseReference(false, false);
+            break;
             // case for expression of the form (expr)
-            case (Keywords.LPAREN):
-                parseExpression();
-                acceptTAndLookahead(Keywords.RPAREN);
-                break;
-            case (Keywords.NUMBER):
-            case (Keywords.TRUE):
-            case (Keywords.FALSE):
-                break;
+        case (Keywords.LPAREN):
+            parseExpression();
+            acceptTAndLookahead(Keywords.RPAREN);
+            break;
+        case (Keywords.NUMBER):
+        case (Keywords.TRUE):
+        case (Keywords.FALSE):
+            break;
             // case for an expression of the "new ..."
-            case (Keywords.NEW):
-                // id () | id [expr]
-                if (match(Keywords.IDENTIFIER)) {
+        case (Keywords.NEW):
+            // id () | id [expr]
+            if (match(Keywords.IDENTIFIER)) {
+                acceptTAndLookahead();
+                if (match(Keywords.LPAREN)) {
                     acceptTAndLookahead();
-                    if (match(Keywords.LPAREN)) {
-                        acceptTAndLookahead();
-                        acceptTAndLookahead(Keywords.RPAREN);
-                    } else if (match(Keywords.LBRACKET)) {
-                        acceptTAndLookahead();
-                        parseExpression();
-                        acceptTAndLookahead(Keywords.RBRACKET);
-                    } else {
-                        parseError(" Method: parseExpression(), case (NEW (id)**), unexpected token: "
-                                   + currentToken.getTokenID());
-                    }
-                    // int [expression]
-                } else if (match(Keywords.INT)) {
+                    acceptTAndLookahead(Keywords.RPAREN);
+                } else if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();
-                    if (match(Keywords.LBRACKET)) {
-                        acceptTAndLookahead();
-                        parseExpression();
-                        acceptTAndLookahead(Keywords.RBRACKET);
-                    } else {
-                        parseError("Method: parseExpression(), case (NEW int[]), unexpected token: "
-                                   + currentToken.getTokenID());
-                    }
-                } else { 
-                    parseError("Method: parseExpression(), case (NEW xx), unexpected token: "
+                    parseExpression();
+                    acceptTAndLookahead(Keywords.RBRACKET);
+                } else {
+                    parseError(" Method: parseExpression(), case (NEW (id)**), unexpected token: "
                                + currentToken.getTokenID());
                 }
-                break;  
-                // a case for an expression of the form unop expr
-                case (Keywords.NEGATION):
-                case (Keywords.MINUS):
+                // int [expression]
+            } else if (match(Keywords.INT)) {
+                acceptTAndLookahead();
+                if (match(Keywords.LBRACKET)) {
+                    acceptTAndLookahead();
                     parseExpression();
-                    break;
-                default:
-                    parseError("Method: parseExpression(), case (default), unexpected token: "
+                    acceptTAndLookahead(Keywords.RBRACKET);
+                } else {
+                    parseError("Method: parseExpression(), case (NEW int[]), unexpected token: "
                                + currentToken.getTokenID());
+                }
+            } else { 
+                parseError("Method: parseExpression(), case (NEW xx), unexpected token: "
+                           + currentToken.getTokenID());
             }
-            // check to see if the expression is of the form expr * expr
-            if (!isBinaryOperator())
-                break;
-            acceptTAndLookahead();
-        }       
+            break;  
+            // a case for an expression of the form unop expr
+        default:
+            parseError("Method: parseIDsInExpression(), case (default), unexpected token: "
+                       +  Keywords.tokenTable[kind]);
+        }
     }
 
     public boolean isUnaryOperator(int kind)

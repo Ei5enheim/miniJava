@@ -97,7 +97,8 @@ public class Keywords
     // special tokens...
     EOT         = 40,
     ERROR       = 41,
-    ERROR_COMMENTS = 42;
+    ERROR_COMMENTS = 42,
+    WHITESPACE = 43;
   public static String[] tokenTable = new String[] {
     "<num>",
     "<identifier>",
@@ -141,6 +142,7 @@ public class Keywords
     "}",
     "$",
     "<error>",
-    "<unclosed_comments>"
+    "<unclosed_comments>",
+    " "
   };
 }

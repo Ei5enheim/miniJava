@@ -10,6 +10,8 @@ package miniJava.SyntacticAnalyzer;
 import java.io.*;
 import java.util.*;
 import miniJava.SyntacticAnalyzer.*;
+import miniJava.AbstractSyntaxTrees.*;
+
 /*
  * Parser Grammar:
  *
@@ -50,6 +52,9 @@ public class Parser
     // An object of Scanner class to scan the source file
     Scanner lexicalAnalyzer;
     boolean debug = true; 
+    FieldDecl fieldDecl;
+    ParameterDeclList paraList;
+
     public Parser()
     {
     }
@@ -57,6 +62,7 @@ public class Parser
     public Parser(Scanner scanner)
     {
         this.lexicalAnalyzer = scanner;
+        fieldDecl = new FieldDecl(false, false, null, null, null);
     }
 
     /*
@@ -87,7 +93,7 @@ public class Parser
      * Returns void.
      */
 
-    public void acceptTAndLookahead(int kind)
+    public String acceptTAndLookahead(int kind)
     {
         if (match(kind)) {
             System.out.println("Accepting token: "+ currentToken.getTokenID());
@@ -95,6 +101,7 @@ public class Parser
         } else {
             parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
         }
+        return (currentToken.getTokenID());
     }
 
     public boolean acceptTAndLookahead(boolean scanWhitespace)
@@ -133,10 +140,13 @@ public class Parser
 
     public void parseFile()
     {
-        currentToken = lexicalAnalyzer.scanToken();
+        ClassDeclList classList = new ClassDeclList();
+        AST pac = new miniJava.AbstractSyntaxTrees.Package(classList, new SourcePosition());
 
+        currentToken = lexicalAnalyzer.scanToken();
         while (!match(Keywords.EOT)) {
-            parseClass();
+            ClassDecl classDecl = parseClass();
+            classList.add(classDecl);
         }
         System.out.println("Successfully parsed the file");
     }
@@ -149,25 +159,39 @@ public class Parser
      * Returns void.
      */
     
-    public void parseClass()
+    public ClassDecl parseClass()
     {
+        ClassDecl classDecl = null;
+        String className = null ;
+        FieldDeclList fieldDeclList = null;
+        MethodDeclList methodDeclList = null;
+        FieldDecl fieldDecl = null;        
+
         acceptTAndLookahead(Keywords.CLASS);
-        acceptTAndLookahead(Keywords.IDENTIFIER);
+        className = acceptTAndLookahead(Keywords.IDENTIFIER);
         acceptTAndLookahead(Keywords.LCURLY);
+
+        fieldDeclList  = new FieldDeclList();
+        methodDeclList = new MethodDeclList(); 
 
         while (!match(Keywords.RCURLY)) {
             // call to Declaration parser
-            parseDeclarator();
-            acceptTAndLookahead(Keywords.IDENTIFIER);
+            fieldDecl = parseDeclarator();
+            fieldDecl.posn = currentToken.pos;
+            fieldDecl.name = acceptTAndLookahead(Keywords.IDENTIFIER);
             /* check to see if it is method variable declaration or
              * method definition.
              */
-            if (match(Keywords.SEMICOLON))
+            if (match(Keywords.SEMICOLON)) {
                 acceptTAndLookahead();
-            else 
+                fieldDeclList.add(fieldDecl);
+            } else { 
                 parseRestOfMethodDeclaration();
+            }
         }
         acceptTAndLookahead(Keywords.RCURLY);
+
+        return (classDecl);
     } 
 
     /*
@@ -179,17 +203,29 @@ public class Parser
      * Returns void.
      */
 
-    public void parseDeclarator()
+    public FieldDecl parseDeclarator()
     {
         int kind = currentToken.getKind();
-        if ((kind == Keywords.PRIVATE) ||
-            (kind == Keywords.PUBLIC)) {
+        if (kind == Keywords.PRIVATE) {
+            fieldDecl.isPrivate = true;
+            acceptTAndLookahead();
+            kind = currentToken.getKind();
+        } else {
+            fieldDecl.isPrivate = false;
+        }
+        if (kind == Keywords.PUBLIC) {
             acceptTAndLookahead();
             kind = currentToken.getKind();
         }
-        if ( kind == Keywords.STATIC)
+        if ( kind == Keywords.STATIC) { 
              acceptTAndLookahead();
-        parseType();
+             fieldDecl.isStatic = true;
+        } else {
+            fieldDecl.isStatic = false;
+        }
+        fieldDecl.type = parseType();
+
+        return (fieldDecl);
     }
 
     /*
@@ -201,24 +237,36 @@ public class Parser
      * Returns void. 
      */    
 
-    public void parseType()
+    public Type parseType()
     {
+        Type typ = null;
+        
         switch (currentToken.getKind()) {
             case (Keywords.INT):
-            case (Keywords.IDENTIFIER):
+                typ = new BaseType(TypeKind.INT, currentToken.pos); 
                 acceptTAndLookahead();
-                if (match(Keywords.LBRACKET)) {
-                    acceptTAndLookahead();
-                    acceptTAndLookahead(Keywords.RBRACKET);
-                }
+                break; 
+            case (Keywords.IDENTIFIER):
+                typ = new ClassType(currentToken.getTokenID(), currentToken.pos);
+                acceptTAndLookahead();
                 break;
             case (Keywords.BOOLEAN):
-            case (Keywords.VOID):
+                typ = new BaseType(TypeKind.BOOLEAN, currentToken.pos);
                 acceptTAndLookahead();
-                break;
+                return (typ);
+            case (Keywords.VOID):
+                typ = new BaseType(TypeKind.VOID, currentToken.pos);
+                acceptTAndLookahead();
+                return (typ);
             default:
                 parseError("Method: parseType(), unexpected token " + currentToken.getTokenID());
         }
+        if (match(Keywords.LBRACKET)) {
+            acceptTAndLookahead();
+            acceptTAndLookahead(Keywords.RBRACKET);
+            typ = new ArrayType(typ, currentToken.pos);
+        }              
+        return (typ);
     }
 
     /*
@@ -232,12 +280,21 @@ public class Parser
 
     public void parseRestOfMethodDeclaration() 
     {
+        Type typ;
+        ParameterDecl paraDecl = null;
+        String name = null;
+        SourcePosition pos = null;
+       
+        paraList = new ParameterDeclList();
         acceptTAndLookahead(Keywords.LPAREN);
         // code below parses the argument list
         if (!match(Keywords.RPAREN)) {
             while (true) {
-                parseType();
-                acceptTAndLookahead(Keywords.IDENTIFIER);
+                typ = parseType();
+                pos = currentToken.pos;
+                name = acceptTAndLookahead(Keywords.IDENTIFIER);
+                paraDecl = new ParameterDecl(typ, name, pos);
+                paraList.add(paraDecl);
                 if (match(Keywords.COMMA))
                     acceptTAndLookahead();
                 else 

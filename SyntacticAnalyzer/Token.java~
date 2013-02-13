@@ -23,7 +23,7 @@ public final class Token
 
     private int kind;
     private String tokenID;
-    public SourcePosition pos;
+    private SourcePosition pos;
 
     public Token()
     {

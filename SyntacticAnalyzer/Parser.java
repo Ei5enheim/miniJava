@@ -555,18 +555,11 @@ public class Parser
         if (debug)
             System.out.println("In parse expressionL6");
         int kind = -1;
-        boolean foundWhitespace = true;
         while (true) {
             kind = currentToken.getKind();
-            if ((kind == Keywords.MINUS) &&
-                foundWhitespace) {
-                foundWhitespace = acceptTAndLookahead(true);
-                if  (foundWhitespace) {
-                    acceptTAndLookahead();
-                }
-            } else if (kind == Keywords.NEGATION) {
+            if ((kind == Keywords.MINUS) || 
+                (kind == Keywords.NEGATION)) {
                 acceptTAndLookahead();
-                foundWhitespace = true;
             } else {
                 break;
             }

@@ -156,7 +156,7 @@ public class Scanner
                 acceptSymbol();
             } while ((scannedSymbol != SourceFile.NEWLINE) && (scannedSymbol != SourceFile.EOI));
             if (scannedSymbol == SourceFile.EOI) {
-                return (2);
+                return (1);
             } else {
                 acceptSymbol();
             }
@@ -261,7 +261,14 @@ public class Scanner
                 return (Keywords.PLUS);
             case ('-'):
                 acceptSymbol();
-                return (Keywords.MINUS);
+                if (scanWhiteSpaceChars()) {
+                    return (Keywords.MINUS);
+                } else if (scannedSymbol != '-') {
+                    return (Keywords.MINUS);
+                } else {
+                    acceptSymbol();
+                    return (Keywords.ERROR);
+                }
             case ('*'):
                 acceptSymbol();
                 return (Keywords.INTO);

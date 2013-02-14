@@ -93,7 +93,7 @@ public class Parser
      * Returns void.
      */
 
-    public String acceptTAndLookahead(int kind)
+    public void acceptTAndLookahead(int kind)
     {
         if (match(kind)) {
             System.out.println("Accepting token: "+ currentToken.getTokenID());
@@ -101,7 +101,6 @@ public class Parser
         } else {
             parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
         }
-        return (currentToken.getTokenID());
     }
 
     public boolean acceptTAndLookahead(boolean scanWhitespace)
@@ -165,10 +164,10 @@ public class Parser
         String className = null ;
         FieldDeclList fieldDeclList = null;
         MethodDeclList methodDeclList = null;
-        FieldDecl fieldDecl = null;        
 
         acceptTAndLookahead(Keywords.CLASS);
-        className = acceptTAndLookahead(Keywords.IDENTIFIER);
+        className = currentToken.getTokenID();
+        acceptTAndLookahead(Keywords.IDENTIFIER);
         acceptTAndLookahead(Keywords.LCURLY);
 
         fieldDeclList  = new FieldDeclList();
@@ -178,7 +177,8 @@ public class Parser
             // call to Declaration parser
             fieldDecl = parseDeclarator();
             fieldDecl.posn = currentToken.pos;
-            fieldDecl.name = acceptTAndLookahead(Keywords.IDENTIFIER);
+            fieldDecl.name = currentToken.getTokenID();
+            acceptTAndLookahead(Keywords.IDENTIFIER);
             /* check to see if it is method variable declaration or
              * method definition.
              */
@@ -186,7 +186,7 @@ public class Parser
                 acceptTAndLookahead();
                 fieldDeclList.add(fieldDecl);
             } else { 
-                parseRestOfMethodDeclaration();
+                parseRestOfMethodDeclaration(fieldDecl);
             }
         }
         acceptTAndLookahead(Keywords.RCURLY);
@@ -278,7 +278,7 @@ public class Parser
      * Returns void. 
      */
 
-    public void parseRestOfMethodDeclaration() 
+    public void parseRestOfMethodDeclaration(FieldDecl fieldDecl) 
     {
         Type typ;
         ParameterDecl paraDecl = null;
@@ -292,7 +292,8 @@ public class Parser
             while (true) {
                 typ = parseType();
                 pos = currentToken.pos;
-                name = acceptTAndLookahead(Keywords.IDENTIFIER);
+                name = currentToken.getTokenID();
+                acceptTAndLookahead(Keywords.IDENTIFIER);
                 paraDecl = new ParameterDecl(typ, name, pos);
                 paraList.add(paraDecl);
                 if (match(Keywords.COMMA))
@@ -398,6 +399,11 @@ public class Parser
 
     }
 
+    public boolean parseIDReference()
+    {
+        return true;
+    }
+
     /*
      * Method parseIDReference()
      *
@@ -408,13 +414,18 @@ public class Parser
      * field/method of an object. In other cases, it returns false.
      */
 
-    public boolean parseIDReference()
+    public boolean parseIDReference(IdentifierList idList)
     {
         boolean retValue = false;
+        String name = null;
+        SourcePosition pos = null;
 
         while (match(Keywords.DOT)) {
             acceptTAndLookahead();
+            pos = currentToken.pos;
+            name = currentToken.getTokenID();
             acceptTAndLookahead(Keywords.IDENTIFIER);
+            idList.add(new Identifier(name, pos));
             retValue = true;
         }
         return (retValue);
@@ -432,6 +443,11 @@ public class Parser
         }
     }
 
+     public void parseReference (boolean isCallFromParseStmt, boolean skip)
+     {
+
+     }
+
     /*
      * Method parseReference()
      *
@@ -441,36 +457,51 @@ public class Parser
      * 
      */
 
-    public void parseReference(boolean isCallFromParseStmt, boolean skip)
+    public AST parseReference (boolean isCallFromParseStmt, boolean skip, Reference ref)
     {
+        Expression expr = null;
+        ExprList exprList = null;
+        IndexedRef indxRef = null;
+        AST ast = null;
+
         if (match(Keywords.LPAREN)) {
             acceptTAndLookahead();
-            while (!match(Keywords.RPAREN)) {
-                parseArgumentList();     
+            exprList = new ExprList();
+            if (!match(Keywords.RPAREN)) {
+                parseArgumentList(exprList);     
             }
-            acceptTAndLookahead();
+            acceptTAndLookahead(Keywords.RPAREN);
             // check to see if a statement or an expression needs to be parsed
-            if (isCallFromParseStmt)
+            if (isCallFromParseStmt) {
                 acceptTAndLookahead(Keywords.SEMICOLON);
+                ast = new CallStmt(ref, exprList, ref.posn);
+            } else {
+                ast = new CallExpr(ref, exprList, ref.posn);
+            }
         } else {
             // skips the check if it is already done by the callee
             if (!skip) {
                 if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();    
-                    parseExpression();
+                    expr = parseExpression();
                     acceptTAndLookahead(Keywords.RBRACKET);
+                    indxRef = new IndexedRef(ref, expr, ref.posn);
+                    ast = new RefExpr(indxRef, ref.posn);            
                 }
             } else { 
-                parseExpression();
+                expr = parseExpression();
                 acceptTAndLookahead(Keywords.RBRACKET);
+                ast = (AST) new RefExpr(ref, ref.posn);
             }
             // check to see if a statement or an expression needs to be parsed
             if (isCallFromParseStmt) {
                 acceptTAndLookahead(Keywords.BECOMES);
-                parseExpression();
+                expr = parseExpression();
                 acceptTAndLookahead(Keywords.SEMICOLON); 
+                //write stmt code
             }
         }
+        return (ast);
     }
 
     /*
@@ -481,12 +512,16 @@ public class Parser
      * 
      */
 
-    public void parseArgumentList()
+    public void parseArgumentList(ExprList exprList)
     {
-        parseExpression();
+        Expression expr = null;
+    
+        expr = parseExpression();
+        exprList.add(expr);
         while (match(Keywords.COMMA)) {
             acceptTAndLookahead();
-            parseExpression();
+            expr = parseExpression();
+            exprList.add(expr);
         }
     }
 
@@ -536,100 +571,160 @@ public class Parser
      * 
      */
 
-    public void parseExpression()
+    public Expression parseExpression()
     {
+        Expression expr1 = null, expr2 = null;
+        Operator op = null;
+
         System.out.println("In parse expression");
-        parseExpressionL1();
+
+        expr1 = parseExpressionL1();
+
         while (match(Keywords.OR)) {
-           acceptTAndLookahead();
-           parseExpressionL1();
+            op = new Operator(currentToken.getTokenID(), currentToken.pos);
+            acceptTAndLookahead();
+            expr2 = parseExpressionL2();
+            expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
+        return (expr1);
     }
 
-    public void parseExpressionL1() 
+    public Expression parseExpressionL1() 
     {
+        Expression expr1 = null, expr2 = null;
+        Operator op = null;
+
         if (debug)
             System.out.println("In parse expressionL1");
-        parseExpressionL2();
+
+        expr1 = parseExpressionL2();
         while (match(Keywords.AND)) {
-           acceptTAndLookahead();
-           parseExpressionL2();
+            op = new Operator(currentToken.getTokenID(), currentToken.pos);
+            acceptTAndLookahead();
+            expr2 = parseExpressionL2();
+            expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
+        return (expr1);
     }
 
-    public void parseExpressionL2()
+    public Expression parseExpressionL2()
     {
+
+        Expression expr1 = null, expr2 = null;
+        Operator op = null;
+
         if (debug)
             System.out.println("In parse expressionL2");
-        parseExpressionL3();
+
+        expr1 = parseExpressionL3();
+        
         while (match(Keywords.EQUALS) ||
                match(Keywords.NEQUALS)) {
-           acceptTAndLookahead();
-           parseExpressionL3();
+            op = new Operator(currentToken.getTokenID(), currentToken.pos);
+            acceptTAndLookahead();
+            expr2 = parseExpressionL3();
+            expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
+        return (expr1);
     }
 
-    public void parseExpressionL3()
+    public Expression parseExpressionL3()
     {
+        Expression expr1 = null, expr2 = null;
+        Operator op = null;
+
         if (debug)
             System.out.println("In parse expressionL3");
-        parseExpressionL4();
+
+        expr1 = parseExpressionL4();
         while (match(Keywords.GTHAN) ||
                match(Keywords.LTHAN) ||
                match(Keywords.GTHANEQT) ||
                match(Keywords.LTHANEQT)) {
-           acceptTAndLookahead();
-           parseExpressionL4();
+            op = new Operator(currentToken.getTokenID(), currentToken.pos);
+            acceptTAndLookahead();
+            expr2 = parseExpressionL4();
+            expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
+        return (expr1);
     }   
 
-    public void parseExpressionL4()
+    public Expression parseExpressionL4()
     {
+        Expression expr1 = null, expr2 = null;
+        Operator op = null;
+        
         if (debug)
             System.out.println("In parse expressionL4");
-        parseExpressionL5();
+    
+        expr1 = parseExpressionL5();
         while (match(Keywords.PLUS) ||
                match(Keywords.MINUS)) {
-           acceptTAndLookahead();
-           parseExpressionL5();
+            op = new Operator(currentToken.getTokenID(), currentToken.pos);    
+            acceptTAndLookahead();
+            expr2 = parseExpressionL5();
+            expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
+        return (expr1);
     }   
 
-    public void parseExpressionL5()
+    public Expression parseExpressionL5()
     {
+        Expression expr1 = null, expr2 = null;
+        Operator op = null;
+
         if (debug)
             System.out.println("In parse expressionL5");
-        parseExpressionL6();
+    
+        expr1 = parseExpressionL6();
+    
         while (match(Keywords.DIVISION) ||
                match(Keywords.INTO)) {
-           acceptTAndLookahead();
-           parseExpressionL6();
+            op = new Operator (currentToken.getTokenID(), currentToken.pos);
+            acceptTAndLookahead();
+            expr2 = parseExpressionL6();
+            expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
+        return (expr1);
     }
 
-    public void parseExpressionL6()
+    public Expression parseExpressionL6()
     {
+        Operator op = null;
+        Expression expr = null;
+        int kind = -1;
+
         if (debug)
             System.out.println("In parse expressionL6");
-        int kind = -1;
-        while (true) {
-            kind = currentToken.getKind();
-            if ((kind == Keywords.MINUS) || 
-                (kind == Keywords.NEGATION)) {
-                acceptTAndLookahead();
-            } else {
-                break;
-            }
+        
+        kind = currentToken.getKind();
+        if ((kind == Keywords.MINUS) || 
+            (kind == Keywords.NEGATION)) {
+            op = new Operator (currentToken.getTokenID(), currentToken.pos);
+            acceptTAndLookahead();
+            expr = new UnaryExpr (op, parseExpressionL6(), currentToken.pos); 
+        } else {
+            expr = (Expression) parseIDsInExpression();
         }
-        parseIDsInExpression();
+        return (expr);
     }
 
-    public void parseIDsInExpression()
+    public AST parseIDsInExpression()
     {
+        Expression expr = null;
+        int kind;
+        SourcePosition pos = null;
+        IdentifierList idList = null;
+        Reference ref = null;
+        String name = null;
+        AST ast = null;
+
         if (debug)
             System.out.println("In parseIDsInExpression");
-        int kind;
+
         kind = currentToken.getKind();
+        pos = currentToken.pos;
+        name = currentToken.getTokenID(); 
         System.out.print("beforehand ");
         acceptTAndLookahead();
         switch (kind) {
@@ -637,46 +732,57 @@ public class Parser
              * method call / reference to an array element
              */
         case (Keywords.THIS):
+            idList = new IdentifierList();
+            parseIDReference(idList);
+            ast = new RefExpr (new QualifiedRef(true, idList, pos), pos);
+            break;
         case (Keywords.IDENTIFIER):
-            parseIDReference();
-            parseReference(false, false);
+            idList = new IdentifierList();
+            idList.add(new Identifier(name, pos));
+            parseIDReference(idList);
+            ref = new QualifiedRef(false, idList, pos);
+            ast = parseReference(false, false, ref);
             break;
             // case for expression of the form (expr)
         case (Keywords.LPAREN):
-            parseExpression();
+            ast = parseExpression();
             acceptTAndLookahead(Keywords.RPAREN);
             break;
         case (Keywords.NUMBER):
+            ast = new LiteralExpr (new IntLiteral (name, pos), pos); 
+            break;
         case (Keywords.TRUE):
         case (Keywords.FALSE):
+            ast = new LiteralExpr (new BooleanLiteral(name, pos), pos);
             break;
             // case for an expression of the "new ..."
         case (Keywords.NEW):
             // id () | id [expr]
             if (match(Keywords.IDENTIFIER)) {
+                name = currentToken.getTokenID();
+                pos = currentToken.pos;
                 acceptTAndLookahead();
                 if (match(Keywords.LPAREN)) {
                     acceptTAndLookahead();
                     acceptTAndLookahead(Keywords.RPAREN);
+                    ast = new NewObjectExpr(new ClassType(name, pos), pos);
                 } else if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();
-                    parseExpression();
+                    expr = parseExpression();
                     acceptTAndLookahead(Keywords.RBRACKET);
+                    ast = new NewArrayExpr( new ClassType(name, pos), expr, pos);
                 } else {
                     parseError(" Method: parseExpression(), case (NEW (id)**), unexpected token: "
                                + currentToken.getTokenID());
                 }
                 // int [expression]
             } else if (match(Keywords.INT)) {
+                pos = currentToken.pos;
                 acceptTAndLookahead();
-                if (match(Keywords.LBRACKET)) {
-                    acceptTAndLookahead();
-                    parseExpression();
-                    acceptTAndLookahead(Keywords.RBRACKET);
-                } else {
-                    parseError("Method: parseExpression(), case (NEW int[]), unexpected token: "
-                               + currentToken.getTokenID());
-                }
+                acceptTAndLookahead(Keywords.LBRACKET);
+                expr =  parseExpression();
+                acceptTAndLookahead(Keywords.RBRACKET);
+                ast = new NewArrayExpr( new BaseType(TypeKind.INT, pos), expr, pos);
             } else { 
                 parseError("Method: parseExpression(), case (NEW xx), unexpected token: "
                            + currentToken.getTokenID());
@@ -687,6 +793,7 @@ public class Parser
             parseError("Method: parseIDsInExpression(), case (default), unexpected token: "
                        +  Keywords.tokenTable[kind]);
         }
+        return (ast);
     }
 
     public boolean isUnaryOperator(int kind)

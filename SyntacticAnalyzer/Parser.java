@@ -62,7 +62,6 @@ public class Parser
     public Parser(Scanner scanner)
     {
         this.lexicalAnalyzer = scanner;
-        fieldDecl = new FieldDecl(false, false, null, null, null);
     }
 
     /*
@@ -137,17 +136,19 @@ public class Parser
      * Returns void.
      */
 
-    public void parseFile()
+    public AST parseFile()
     {
+
         ClassDeclList classList = new ClassDeclList();
         AST pac = new miniJava.AbstractSyntaxTrees.Package(classList, new SourcePosition());
 
         currentToken = lexicalAnalyzer.scanToken();
+        pac = new miniJava.AbstractSyntaxTrees.Package(classList, currentToken.pos);
         while (!match(Keywords.EOT)) {
-            ClassDecl classDecl = parseClass();
-            classList.add(classDecl);
+            classList.add(parseClass());
         }
         System.out.println("Successfully parsed the file");
+        return (pac);
     }
 
     /*
@@ -164,7 +165,9 @@ public class Parser
         String className = null ;
         FieldDeclList fieldDeclList = null;
         MethodDeclList methodDeclList = null;
+        SourcePosition pos = null, localPos = null;
 
+        pos = currentToken.pos;
         acceptTAndLookahead(Keywords.CLASS);
         className = currentToken.getTokenID();
         acceptTAndLookahead(Keywords.IDENTIFIER);
@@ -175,8 +178,9 @@ public class Parser
 
         while (!match(Keywords.RCURLY)) {
             // call to Declaration parser
+            localPos = currentToken.pos;
             fieldDecl = parseDeclarator();
-            fieldDecl.posn = currentToken.pos;
+            fieldDecl.posn = localPos;
             fieldDecl.name = currentToken.getTokenID();
             acceptTAndLookahead(Keywords.IDENTIFIER);
             /* check to see if it is method variable declaration or
@@ -186,12 +190,12 @@ public class Parser
                 acceptTAndLookahead();
                 fieldDeclList.add(fieldDecl);
             } else { 
-                parseRestOfMethodDeclaration(fieldDecl);
+                methodDeclList.add(parseRestOfMethodDeclaration(fieldDecl));
             }
         }
         acceptTAndLookahead(Keywords.RCURLY);
-
-        return (classDecl);
+        
+        return (new ClassDecl(className, fieldDeclList, methodDeclList, pos));
     } 
 
     /*
@@ -206,13 +210,13 @@ public class Parser
     public FieldDecl parseDeclarator()
     {
         int kind = currentToken.getKind();
+        FieldDecl fieldDecl = new FieldDecl(false, false, null, null, null);
         if (kind == Keywords.PRIVATE) {
             fieldDecl.isPrivate = true;
             acceptTAndLookahead();
             kind = currentToken.getKind();
-        } else {
-            fieldDecl.isPrivate = false;
         }
+ 
         if (kind == Keywords.PUBLIC) {
             acceptTAndLookahead();
             kind = currentToken.getKind();
@@ -220,8 +224,6 @@ public class Parser
         if ( kind == Keywords.STATIC) { 
              acceptTAndLookahead();
              fieldDecl.isStatic = true;
-        } else {
-            fieldDecl.isStatic = false;
         }
         fieldDecl.type = parseType();
 
@@ -278,12 +280,14 @@ public class Parser
      * Returns void. 
      */
 
-    public void parseRestOfMethodDeclaration(FieldDecl fieldDecl) 
+    public MethodDecl parseRestOfMethodDeclaration(FieldDecl fieldDecl) 
     {
         Type typ;
         ParameterDecl paraDecl = null;
         String name = null;
         SourcePosition pos = null;
+        StatementList stmtList = null;
+        Expression expr = null;
        
         paraList = new ParameterDeclList();
         acceptTAndLookahead(Keywords.LPAREN);
@@ -305,17 +309,20 @@ public class Parser
         acceptTAndLookahead(Keywords.RPAREN);
         // code below parses the body of the method.
         acceptTAndLookahead(Keywords.LCURLY);
+        stmtList = new StatementList();
         while (!match(Keywords.RCURLY)) {
             if (match(Keywords.RETURN)) {
                 acceptTAndLookahead();
-                parseExpression();
+                expr = parseExpression();
                 acceptTAndLookahead(Keywords.SEMICOLON);
-                break;
+                acceptTAndLookahead(Keywords.RCURLY);
+                return (new MethodDecl(fieldDecl, paraList, stmtList, expr, fieldDecl.posn));
             } else {
-                parseStmt();
+                stmtList.add((Statement)parseStmt());
             }   
         }
         acceptTAndLookahead(Keywords.RCURLY);
+        return (new MethodDecl(fieldDecl, paraList, stmtList, expr, fieldDecl.posn));
     } 
 
     /*
@@ -327,81 +334,127 @@ public class Parser
      * Returns void. 
      */
 
-    public void parseStmt() 
+    public AST parseStmt() 
     {
-        int kind = currentToken.getKind();
+        AST ast = null;
+        StatementList stmtList = null;
+        SourcePosition pos = null, localPos= null;
+        IdentifierList idList = null;
+        Reference ref = null;
+        Expression expr = null;
+        String name = null, localName = null;
+        VarDecl varDecl = null;
+        int kind = -1;
+        boolean cond = false;
+
+        kind = currentToken.getKind();
+        pos = currentToken.pos; 
+        name = currentToken.getTokenID();
         acceptTAndLookahead();
+
         switch (kind) {
             case (Keywords.LCURLY):
+                stmtList = new StatementList();
                 while (!match(Keywords.RCURLY)) {
-                    parseStmt();
+                    stmtList.add((Statement) parseStmt());
                 }
                 acceptTAndLookahead();
+                ast = new BlockStmt(stmtList, pos);
                 break;
             // case for a statement starting with a reference 
             case (Keywords.THIS):
-                parseIDReference();
-                parseReference(true, false);
+                idList = new IdentifierList();
+                parseIDReference(idList);
+                ref = new QualifiedRef(true, idList, pos);
+                ast = parseReference(true, false, ref);
                 break;
             // case for a statement which is a variable/field/array defintion 
             case (Keywords.INT):
-                parseBrackets(false);
-                acceptTAndLookahead(Keywords.IDENTIFIER); 
-                parseRestOfAssignmentStmt(); 
+                cond = parseBrackets(false);
+                localPos = currentToken.pos; 
+                name = currentToken.getTokenID();
+                acceptTAndLookahead(Keywords.IDENTIFIER);
+                expr = parseRestOfAssignmentStmt(); 
+                if (cond)
+                    varDecl = new VarDecl(new BaseType(TypeKind.ARRAY, localPos),
+                                          name, localPos);
+                else 
+                    varDecl = new VarDecl(new BaseType(TypeKind.INT, localPos),
+                                          name, localPos);
+                ast = new VarDeclStmt(varDecl, expr, pos);
                 break;
             // case for a statement which is a variable/field defintion
             case (Keywords.BOOLEAN):
-            case (Keywords.VOID):
+                name = currentToken.getTokenID();
                 acceptTAndLookahead(Keywords.IDENTIFIER);
-                parseRestOfAssignmentStmt(); 
+                expr = parseRestOfAssignmentStmt();
+                varDecl = new VarDecl(new BaseType(TypeKind.BOOLEAN, pos), name, pos);
+                ast = new VarDeclStmt(varDecl, expr, pos);
+                break;
+            case (Keywords.VOID):
+                name = currentToken.getTokenID();
+                acceptTAndLookahead(Keywords.IDENTIFIER);
+                expr = parseRestOfAssignmentStmt(); 
+                varDecl = new VarDecl(new BaseType(TypeKind.VOID, pos), name, pos);
+                ast = new VarDeclStmt(varDecl, expr, pos);
                 break;
             // case for a statement starting with a class identifier
             case (Keywords.IDENTIFIER):
-                // check to see if it is a statement starting with a reference or a method call
-                if (parseIDReference() || match(Keywords.LPAREN)) {
-                    parseReference(true, false);
-                // check to see if it is a class declaration.
-                } else if (match(Keywords.LBRACKET)) {
+                if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();
                     if (match(Keywords.RBRACKET)) {
                         acceptTAndLookahead();
+                        localPos = currentToken.pos;
+                        name = currentToken.getTokenID();
                         acceptTAndLookahead(Keywords.IDENTIFIER);
-                        parseRestOfAssignmentStmt();
+                        expr = parseRestOfAssignmentStmt();
+                        varDecl = new VarDecl(new BaseType(TypeKind.ARRAY, localPos), name, localPos);
+                        ast = new VarDeclStmt(varDecl, expr, pos);
                     } else {
                         // case for a statement starting with an array reference.
-                        parseReference(true, true);
+                        ref = new QualifiedRef(new Identifier(name, pos));
+                        ast = parseReference(true, true, ref);
                     }
                 } else {
-                    // below code parses definition of a class instance variable.
-                    if (match(Keywords.IDENTIFIER)) {
-                        acceptTAndLookahead();
-                        parseRestOfAssignmentStmt();
+                    idList = new IdentifierList();
+                    idList.add(new Identifier(name, pos));
+                    // check to see if it is a statement starting with a reference or a method call
+                    if (parseIDReference(idList) || match(Keywords.LPAREN)) {
+                        ref = new QualifiedRef(false, idList, pos);
+                        ast = parseReference(true, false, ref);
                     } else {
-                        // parses a statement which is a reference assignment statement
-                        parseReference(true, false);
+                    // below code parses definition of a class instance variable.
+                        if (match(Keywords.IDENTIFIER)) {
+                            localName = currentToken.getTokenID();
+                            localPos = currentToken.pos;
+                            acceptTAndLookahead();
+                            expr = parseRestOfAssignmentStmt();
+                            varDecl = new VarDecl(new ClassType(localName, localPos), name, pos);
+                            ast = new VarDeclStmt(varDecl, expr, pos);
+                        } else {
+                            // parses a statement which is a reference assignment statement
+                            ref = new QualifiedRef(false, idList, pos);
+                            ast = parseReference(true, false, ref);
+                        }
                     }
                 }
                 break;
             // case for parsing of IF statement
             case (Keywords.IF):
-                parseIFStatement();
+                ast = parseIFStatement(pos);
                 break;
             // case of parsing of WHILE statement
             case (Keywords.WHILE):
                 acceptTAndLookahead(Keywords.LPAREN);
-                parseExpression();
+                expr = parseExpression();
                 acceptTAndLookahead(Keywords.RPAREN);
-                parseStmt();
+                ast = parseStmt();
+                ast = new WhileStmt(expr, (Statement) ast, pos);
                 break;
             default:
                 parseError("Method parseStmt(), unexpected token " + currentToken.getTokenID());
         }
-
-    }
-
-    public boolean parseIDReference()
-    {
-        return true;
+        return (ast);
     }
 
     /*
@@ -431,22 +484,21 @@ public class Parser
         return (retValue);
     }
 
-    public void parseIFStatement()
+    public Statement parseIFStatement(SourcePosition pos)
     {
+        Expression expr = null;
+        AST thenStmt = null, elseStmt = null;
+
         acceptTAndLookahead(Keywords.LPAREN);
-        parseExpression();
+        expr = parseExpression();
         acceptTAndLookahead(Keywords.RPAREN);
-        parseStmt();
+        thenStmt = parseStmt();
         if (match(Keywords.ELSE)) {
             acceptTAndLookahead();
-            parseStmt();
+            elseStmt = parseStmt();
         }
+        return (new IfStmt(expr, (Statement) thenStmt, (Statement) elseStmt, pos));
     }
-
-     public void parseReference (boolean isCallFromParseStmt, boolean skip)
-     {
-
-     }
 
     /*
      * Method parseReference()
@@ -487,18 +539,20 @@ public class Parser
                     acceptTAndLookahead(Keywords.RBRACKET);
                     indxRef = new IndexedRef(ref, expr, ref.posn);
                     ast = new RefExpr(indxRef, ref.posn);            
+                } else {
+                    ast = new RefExpr(ref, ref.posn);
                 }
             } else { 
                 expr = parseExpression();
                 acceptTAndLookahead(Keywords.RBRACKET);
-                ast = (AST) new RefExpr(ref, ref.posn);
+                ast = new RefExpr(ref, ref.posn);
             }
             // check to see if a statement or an expression needs to be parsed
             if (isCallFromParseStmt) {
                 acceptTAndLookahead(Keywords.BECOMES);
                 expr = parseExpression();
-                acceptTAndLookahead(Keywords.SEMICOLON); 
-                //write stmt code
+                acceptTAndLookahead(Keywords.SEMICOLON);
+                ast = new AssignStmt(ref, expr, ref.posn); 
             }
         }
         return (ast);
@@ -535,11 +589,13 @@ public class Parser
      */
 
 
-    public void parseRestOfAssignmentStmt()
+    public Expression parseRestOfAssignmentStmt()
     {
+        Expression expr = null;
         acceptTAndLookahead(Keywords.BECOMES);
-        parseExpression();
+        expr = parseExpression();
         acceptTAndLookahead(Keywords.SEMICOLON);
+        return (expr);
     }
 
     /*
@@ -550,8 +606,11 @@ public class Parser
      * 
      */
  
-    public void parseBrackets(boolean exitOnError)
+    public boolean parseBrackets(boolean exitOnError)
     {
+
+        boolean rv = false;
+
         if (match(Keywords.LBRACKET)) {
             acceptTAndLookahead();
             if (match(Keywords.RBRACKET))
@@ -559,8 +618,10 @@ public class Parser
             else
                 parseError("Method: parseBrackets(), Unxpectedtokentype: " + 
                            currentToken.getTokenID() + " expecting token: "+ 
-                           Keywords.tokenTable[Keywords.RBRACKET]);  
+                           Keywords.tokenTable[Keywords.RBRACKET]); 
+            rv = true;
         }
+        return (rv);
     }
 
     /*
@@ -663,6 +724,8 @@ public class Parser
             op = new Operator(currentToken.getTokenID(), currentToken.pos);    
             acceptTAndLookahead();
             expr2 = parseExpressionL5();
+            if (expr1 == null)
+                System.out.println("FUCK");
             expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
         return (expr1);
@@ -692,6 +755,7 @@ public class Parser
     {
         Operator op = null;
         Expression expr = null;
+        SourcePosition pos = null;
         int kind = -1;
 
         if (debug)
@@ -700,9 +764,10 @@ public class Parser
         kind = currentToken.getKind();
         if ((kind == Keywords.MINUS) || 
             (kind == Keywords.NEGATION)) {
-            op = new Operator (currentToken.getTokenID(), currentToken.pos);
+            pos = currentToken.pos;
+            op = new Operator (currentToken.getTokenID(), pos);
             acceptTAndLookahead();
-            expr = new UnaryExpr (op, parseExpressionL6(), currentToken.pos); 
+            expr = new UnaryExpr (op, parseExpressionL6(), pos); 
         } else {
             expr = (Expression) parseIDsInExpression();
         }
@@ -734,7 +799,8 @@ public class Parser
         case (Keywords.THIS):
             idList = new IdentifierList();
             parseIDReference(idList);
-            ast = new RefExpr (new QualifiedRef(true, idList, pos), pos);
+            ref = new QualifiedRef(true, idList, pos);
+            ast = parseReference(false, false, ref);
             break;
         case (Keywords.IDENTIFIER):
             idList = new IdentifierList();

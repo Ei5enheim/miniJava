@@ -43,7 +43,11 @@ public class Scanner
     private boolean bufferSym;
     // Table that holds the keywords and their token identifiers
     private Keywords keywordsTable;
-    
+    public static final int SCANAHEAD = 1;
+    public static final int NOTACOMMENT = 0;
+    public static final int UNDISCLOSEDCOMM = 2;
+    public boolean debug = false;       
+ 
     public Scanner() 
     {
         bufferSym = true;
@@ -156,7 +160,10 @@ public class Scanner
                 acceptSymbol();
             } while ((scannedSymbol != SourceFile.NEWLINE) && (scannedSymbol != SourceFile.EOI));
             if (scannedSymbol == SourceFile.EOI) {
-                return (1);
+                /* returning one because comments can be at the end 
+                 * of the program
+                 */
+                return (SCANAHEAD);
             } else {
                 acceptSymbol();
             }
@@ -171,21 +178,21 @@ public class Scanner
                         acceptSymbol();
                         break;
                     } else if (scannedSymbol == SourceFile.EOI) {
-                        return (2);
+                        return (UNDISCLOSEDCOMM);
                     }
                 } else if (scannedSymbol == SourceFile.EOI) {
-                    return (2);
+                    return (UNDISCLOSEDCOMM);
                 } else {
                     acceptSymbol();
                 }
             }
         } else {
             bufferSym = true;
-            return (0);
+            return (NOTACOMMENT);
         }
         buffer = new StringBuffer();
         bufferSym = true;
-        return (1);
+        return (SCANAHEAD);
     }
 
     /*
@@ -261,9 +268,7 @@ public class Scanner
                 return (Keywords.PLUS);
             case ('-'):
                 acceptSymbol();
-                if (scanWhiteSpaceChars()) {
-                    return (Keywords.MINUS);
-                } else if (scannedSymbol != '-') {
+                if (scannedSymbol != '-') {
                     return (Keywords.MINUS);
                 } else {
                     acceptSymbol();
@@ -275,9 +280,9 @@ public class Scanner
             case ('/'):
                 acceptSymbol();
                 int rv = scanComments();
-                if (rv == 1)
+                if (rv == SCANAHEAD)
                     return (scan(false));
-                else if (rv == 0)
+                else if (rv == NOTACOMMENT)
                     return (Keywords.DIVISION);
                 else 
                     return (Keywords.ERROR_COMMENTS); 
@@ -347,7 +352,8 @@ public class Scanner
                     return (Keywords.IDENTIFIER); 
                 } else {
                     acceptSymbol();
-                    System.out.println("undefined character");
+                    if (debug)
+                        System.out.println("undefined character");
                     return (Keywords.ERROR);
                 }
             }    

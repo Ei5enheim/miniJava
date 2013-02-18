@@ -51,9 +51,7 @@ public class Parser
     Token currentToken;
     // An object of Scanner class to scan the source file
     Scanner lexicalAnalyzer;
-    boolean debug = true; 
-    FieldDecl fieldDecl;
-    ParameterDeclList paraList;
+    boolean debug = false; 
 
     public Parser()
     {
@@ -95,7 +93,8 @@ public class Parser
     public void acceptTAndLookahead(int kind)
     {
         if (match(kind)) {
-            System.out.println("Accepting token: "+ currentToken.getTokenID());
+            if (debug)
+                System.out.println("Accepting token: "+ currentToken.getTokenID());
             currentToken = lexicalAnalyzer.scanToken();
         } else {
             parseError("Expected token: " + Keywords.tokenTable[kind] + ", but found token: "+ currentToken.getTokenID());
@@ -104,7 +103,8 @@ public class Parser
 
     public boolean acceptTAndLookahead(boolean scanWhitespace)
     {
-        System.out.println("Accepting token: "+ currentToken.getTokenID());
+        if (debug)
+            System.out.println("Accepting token: "+ currentToken.getTokenID());
         currentToken = lexicalAnalyzer.scanToken(scanWhitespace);
         if (currentToken.getKind() == Keywords.WHITESPACE) {
             return (true);
@@ -123,7 +123,8 @@ public class Parser
 
     public void acceptTAndLookahead()
     {
-        System.out.println("Accepting token: "+ currentToken.getTokenID());
+        if (debug)
+            System.out.println("Accepting token: "+ currentToken.getTokenID());
         currentToken = lexicalAnalyzer.scanToken();
     }
 
@@ -140,14 +141,15 @@ public class Parser
     {
 
         ClassDeclList classList = new ClassDeclList();
-        AST pac = new miniJava.AbstractSyntaxTrees.Package(classList, new SourcePosition());
+        AST pac = null;
 
         currentToken = lexicalAnalyzer.scanToken();
         pac = new miniJava.AbstractSyntaxTrees.Package(classList, currentToken.pos);
         while (!match(Keywords.EOT)) {
             classList.add(parseClass());
         }
-        System.out.println("Successfully parsed the file");
+        if (debug)
+            System.out.println("Successfully parsed the file");
         return (pac);
     }
 
@@ -166,6 +168,7 @@ public class Parser
         FieldDeclList fieldDeclList = null;
         MethodDeclList methodDeclList = null;
         SourcePosition pos = null, localPos = null;
+        FieldDecl fieldDecl = null;        
 
         pos = currentToken.pos;
         acceptTAndLookahead(Keywords.CLASS);
@@ -183,8 +186,8 @@ public class Parser
             fieldDecl.posn = localPos;
             fieldDecl.name = currentToken.getTokenID();
             acceptTAndLookahead(Keywords.IDENTIFIER);
-            /* check to see if it is method variable declaration or
-             * method definition.
+            /* check to see if it's a variable declaration or
+             * a method definition.
              */
             if (match(Keywords.SEMICOLON)) {
                 acceptTAndLookahead();
@@ -211,16 +214,16 @@ public class Parser
     {
         int kind = currentToken.getKind();
         FieldDecl fieldDecl = new FieldDecl(false, false, null, null, null);
+
         if (kind == Keywords.PRIVATE) {
             fieldDecl.isPrivate = true;
             acceptTAndLookahead();
             kind = currentToken.getKind();
-        }
- 
-        if (kind == Keywords.PUBLIC) {
+        } else if (kind == Keywords.PUBLIC) {
             acceptTAndLookahead();
             kind = currentToken.getKind();
         }
+
         if ( kind == Keywords.STATIC) { 
              acceptTAndLookahead();
              fieldDecl.isStatic = true;
@@ -242,7 +245,8 @@ public class Parser
     public Type parseType()
     {
         Type typ = null;
-        
+        boolean arrayCond = false;
+ 
         switch (currentToken.getKind()) {
             case (Keywords.INT):
                 typ = new BaseType(TypeKind.INT, currentToken.pos); 
@@ -266,8 +270,8 @@ public class Parser
         if (match(Keywords.LBRACKET)) {
             acceptTAndLookahead();
             acceptTAndLookahead(Keywords.RBRACKET);
-            typ = new ArrayType(typ, currentToken.pos);
-        }              
+            typ = new ArrayType(typ, typ.posn);
+        }
         return (typ);
     }
 
@@ -282,13 +286,14 @@ public class Parser
 
     public MethodDecl parseRestOfMethodDeclaration(FieldDecl fieldDecl) 
     {
-        Type typ;
+        Type typ = null;
         ParameterDecl paraDecl = null;
         String name = null;
         SourcePosition pos = null;
         StatementList stmtList = null;
         Expression expr = null;
-       
+        ParameterDeclList paraList = null;      
+ 
         paraList = new ParameterDeclList();
         acceptTAndLookahead(Keywords.LPAREN);
         // code below parses the argument list
@@ -344,6 +349,7 @@ public class Parser
         Expression expr = null;
         String name = null, localName = null;
         VarDecl varDecl = null;
+        Type typ = null;
         int kind = -1;
         boolean cond = false;
 
@@ -375,12 +381,13 @@ public class Parser
                 name = currentToken.getTokenID();
                 acceptTAndLookahead(Keywords.IDENTIFIER);
                 expr = parseRestOfAssignmentStmt(); 
+                typ = new BaseType(TypeKind.INT, localPos);
                 if (cond)
-                    varDecl = new VarDecl(new BaseType(TypeKind.ARRAY, localPos),
-                                          name, localPos);
+                    varDecl = new VarDecl(new ArrayType(typ, localPos),
+                                          name, pos);
                 else 
-                    varDecl = new VarDecl(new BaseType(TypeKind.INT, localPos),
-                                          name, localPos);
+                    varDecl = new VarDecl(typ, name, pos);
+
                 ast = new VarDeclStmt(varDecl, expr, pos);
                 break;
             // case for a statement which is a variable/field defintion
@@ -405,10 +412,11 @@ public class Parser
                     if (match(Keywords.RBRACKET)) {
                         acceptTAndLookahead();
                         localPos = currentToken.pos;
-                        name = currentToken.getTokenID();
+                        localName = currentToken.getTokenID();
                         acceptTAndLookahead(Keywords.IDENTIFIER);
                         expr = parseRestOfAssignmentStmt();
-                        varDecl = new VarDecl(new BaseType(TypeKind.ARRAY, localPos), name, localPos);
+                        varDecl = new VarDecl(new ArrayType(new ClassType(name, localPos),
+                                              pos), localName, pos);
                         ast = new VarDeclStmt(varDecl, expr, pos);
                     } else {
                         // case for a statement starting with an array reference.
@@ -429,7 +437,7 @@ public class Parser
                             localPos = currentToken.pos;
                             acceptTAndLookahead();
                             expr = parseRestOfAssignmentStmt();
-                            varDecl = new VarDecl(new ClassType(localName, localPos), name, pos);
+                            varDecl = new VarDecl(new ClassType(name, pos), localName, localPos);
                             ast = new VarDeclStmt(varDecl, expr, pos);
                         } else {
                             // parses a statement which is a reference assignment statement
@@ -452,7 +460,7 @@ public class Parser
                 ast = new WhileStmt(expr, (Statement) ast, pos);
                 break;
             default:
-                parseError("Method parseStmt(), unexpected token " + currentToken.getTokenID());
+                parseError("Method parseStmt(), unexpected token " + name);
         }
         return (ast);
     }
@@ -487,17 +495,17 @@ public class Parser
     public Statement parseIFStatement(SourcePosition pos)
     {
         Expression expr = null;
-        AST thenStmt = null, elseStmt = null;
+        Statement thenStmt = null, elseStmt = null;
 
         acceptTAndLookahead(Keywords.LPAREN);
         expr = parseExpression();
         acceptTAndLookahead(Keywords.RPAREN);
-        thenStmt = parseStmt();
+        thenStmt = (Statement) parseStmt();
         if (match(Keywords.ELSE)) {
             acceptTAndLookahead();
-            elseStmt = parseStmt();
+            elseStmt = (Statement) parseStmt();
         }
-        return (new IfStmt(expr, (Statement) thenStmt, (Statement) elseStmt, pos));
+        return (new IfStmt(expr, thenStmt, elseStmt, pos));
     }
 
     /*
@@ -537,15 +545,15 @@ public class Parser
                     acceptTAndLookahead();    
                     expr = parseExpression();
                     acceptTAndLookahead(Keywords.RBRACKET);
-                    indxRef = new IndexedRef(ref, expr, ref.posn);
-                    ast = new RefExpr(indxRef, ref.posn);            
+                    ref = new IndexedRef(ref, expr, ref.posn);
+                    ast = new RefExpr(ref, ref.posn);            
                 } else {
                     ast = new RefExpr(ref, ref.posn);
                 }
             } else { 
                 expr = parseExpression();
                 acceptTAndLookahead(Keywords.RBRACKET);
-                ast = new RefExpr(ref, ref.posn);
+                ref = new IndexedRef(ref, expr, ref.posn);
             }
             // check to see if a statement or an expression needs to be parsed
             if (isCallFromParseStmt) {
@@ -587,8 +595,6 @@ public class Parser
      * symbol.
      * 
      */
-
-
     public Expression parseRestOfAssignmentStmt()
     {
         Expression expr = null;
@@ -637,7 +643,8 @@ public class Parser
         Expression expr1 = null, expr2 = null;
         Operator op = null;
 
-        System.out.println("In parse expression");
+        if (debug)
+            System.out.println("In parse expression");
 
         expr1 = parseExpressionL1();
 
@@ -724,8 +731,6 @@ public class Parser
             op = new Operator(currentToken.getTokenID(), currentToken.pos);    
             acceptTAndLookahead();
             expr2 = parseExpressionL5();
-            if (expr1 == null)
-                System.out.println("FUCK");
             expr1 = new BinaryExpr (op, expr1, expr2, expr1.posn);
         }
         return (expr1);
@@ -790,7 +795,8 @@ public class Parser
         kind = currentToken.getKind();
         pos = currentToken.pos;
         name = currentToken.getTokenID(); 
-        System.out.print("beforehand ");
+        if (debug)
+            System.out.print("beforehand ");
         acceptTAndLookahead();
         switch (kind) {
             /* case for an expression which is a 
@@ -881,14 +887,16 @@ public class Parser
 
     public void parseError(String str, boolean exitOnError)
     {
-        System.out.println("Parse Error, " + str);
+        if (debug)
+            System.out.println("Parse Error, " + str);
         if (exitOnError)
             System.exit(4);
     }
 
     public void parseError(String str) 
     {
-        System.out.println("Parse Error, " + str);
+        if (debug)
+            System.out.println("Parse Error, " + str);
         System.exit(4);
     }
 }

@@ -285,7 +285,12 @@ public class ASTDisplay implements Visitor<String,Object> {
         return null;
     }
 
- 
+    /**
+    public Reference visitQualifiedRef(QualifiedRef ref) 
+    {
+        return null;
+    }
+    
     public Object visitLocalRef(LocalRef ref, String arg)
     {
         return null;
@@ -310,5 +315,5 @@ public class ASTDisplay implements Visitor<String,Object> {
     {
         return null;
     }
-    
+    */
 }

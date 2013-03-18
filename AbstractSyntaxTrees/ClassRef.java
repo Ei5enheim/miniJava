@@ -33,7 +33,8 @@ public class ClassRef extends Reference
 
     public <A,R> R visit(Visitor<A,R> v, A o)
     {
-        return v.visitClassRef(this, o);
+        return null;
+        //v.visitClassRef(this, o);
     }
 
     //public Identifier id;

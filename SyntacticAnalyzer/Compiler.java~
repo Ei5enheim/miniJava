@@ -1,0 +1,25 @@
+package miniJava.SyntacticAnalyzer;
+
+import java.io.*;
+//import java.util.*;
+import miniJava.SyntacticAnalyzer.*;
+import miniJava.AbstractSyntaxTrees.*;
+public class Compiler 
+{
+    
+    public Compiler(String file) 
+    {
+ 	System.out.println("fuck you");
+    }
+
+    public static void main(String args[])
+    {
+        miniJava.AbstractSyntaxTrees.Package pac = null;
+        ASTDisplay astDisplay = new ASTDisplay ();
+        Compiler test = new Compiler(args[0]); 
+        pac = (miniJava.AbstractSyntaxTrees.Package) test.parser.parseFile(); 
+        astDisplay.showTree(pac);
+        System.exit(0);
+    }
+}
+

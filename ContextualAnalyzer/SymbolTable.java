@@ -23,7 +23,7 @@ public class SymbolTable
     {
         parentScope = -1;
         // level = 0 is reserved for keywords
-        level = 0;
+        level = -1;
         symbolTable = new ArrayList<HashMap<String, STEntry>>(symbolTableSize);
     }
 
@@ -34,7 +34,7 @@ public class SymbolTable
         if (debug)
             System.out.println("new Scope level: " + level);
 
-        symbolTable.add(Integer.valueOf(level), innerTable);
+        symbolTable.add(innerTable);
     }
 
     public void newScope(boolean setParentScope)
@@ -47,7 +47,7 @@ public class SymbolTable
             parentScope = level;
 
         if (debug)
-            System.out.println("new Scope level: " + level);
+            System.out.println("new Scope level: " + level + "parent scope level" + parentScope);
 
         symbolTable.add(innerTable);
     }
@@ -56,14 +56,20 @@ public class SymbolTable
     {
         symbolTable.remove(level);
         level--;
+        if (debug)
+            System.out.println("back to Scope level: " + level + ", parent scope level" + parentScope);
     }
 
     public void closeScope(boolean resetParentScope)
     {
         symbolTable.remove(level);
         level--;
-        if (resetParentScope)
-            parentScope = level;
+        if (resetParentScope && level < 2)
+            parentScope = -1;
+	else if (resetParentScope)
+	    parentScope = level;
+        if (debug)
+            System.out.println("back to Scope level: " + level + ", parent scope level" + parentScope);
     }
 
     public boolean add (String key, Declaration decl)
@@ -77,11 +83,12 @@ public class SymbolTable
             // need to change this and add a Error and return
             return (true);
         }
-        if (level > parentScope)
+        if (level > parentScope && (parentScope != -1)) {
             parentTable = symbolTable.get(parentScope);
+	    return (parentTable.containsKey(key));
+	}
 
-        if (innerTable.containsKey(key) ||
-            parentTable.containsKey(key)) {
+        if (innerTable.containsKey(key)) {
             return (true);
         } 
 
@@ -105,6 +112,18 @@ public class SymbolTable
             }
         }
         return (null);
+    }
+
+    public Declaration retrieveClassDecl (String key)
+    {
+        int index = 1;
+        HashMap<String, STEntry> innerTable = null;        
+
+       innerTable = symbolTable.get(index);
+       if (innerTable.containsKey(key)) {
+           return (innerTable.get(key).astNode);
+       } 
+       return (null);
     }
 
     public int retrieveLevel (String key)

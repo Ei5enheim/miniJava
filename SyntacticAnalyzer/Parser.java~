@@ -217,11 +217,9 @@ public class Parser
 
         if (kind == Keywords.PRIVATE) {
             fieldDecl.isPrivate = true;
-	    fieldDecl.isPublic = false;
             acceptTAndLookahead();
             kind = currentToken.getKind();
         } else if (kind == Keywords.PUBLIC) {
-	    fieldDecl.isPrivate = false;
 	    fieldDecl.isPublic = true;
             acceptTAndLookahead();
             kind = currentToken.getKind();
@@ -249,15 +247,13 @@ public class Parser
     {
         Type typ = null;
         boolean arrayCond = false;
-        String name = null;
-
+ 
         switch (currentToken.getKind()) {
             case (Keywords.INT):
                 typ = new BaseType(TypeKind.INT, currentToken.pos); 
                 acceptTAndLookahead();
                 break; 
             case (Keywords.IDENTIFIER):
-                name = currentToken.getTokenID();
                 typ = new ClassType(currentToken.getTokenID(), currentToken.pos);
                 acceptTAndLookahead();
                 break;
@@ -274,7 +270,6 @@ public class Parser
         }
         if (match(Keywords.LBRACKET)) {
             acceptTAndLookahead();
-            //System.out.println("found array type " +  name);
             acceptTAndLookahead(Keywords.RBRACKET);
             typ = new ArrayType(typ, typ.posn);
         }

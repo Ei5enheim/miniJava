@@ -7,14 +7,13 @@
 package miniJava.ContextualAnalyzer;
 
 import miniJava.AbstractSyntaxTrees.*;
-import miniJava.SyntacticAnalyzer.SourcePosition;
 import miniJava.AbstractSyntaxTrees.Package;
 public class Identification implements Visitor<String,Object> {
 	
-    public boolean showPosition = false;
-    private boolean secondWalk = false, debug = true;
+    public static boolean showPosition = false;
+    private static boolean secondWalk = false;
     private SymbolTable table;
-    private boolean isStaticMethod = false, mainMethodFound = false;
+    private static boolean isStaticMethod = false;
     private String currentClass = null;
     private ErrorReporter reporter;
     
@@ -25,8 +24,6 @@ public class Identification implements Visitor<String,Object> {
         table = new SymbolTable();
         reporter = new ErrorReporter();
         // add the standard env here and do not forget to increment the level
-        table.newScope();
-        addStandardImports();
     }
 
     public void Identify (AST ast)
@@ -54,32 +51,22 @@ public class Identification implements Visitor<String,Object> {
     public Object visitClassDecl(ClassDecl clas, String arg){
        
         // need to add the exit(4) code in the symbol table
-        if (debug)
-            System.out.println(" In class decl " + clas.name);
-        if (!secondWalk) {
-            if (table.add(clas.name, clas)) {
-                reporter.reportError("duplicate class ", clas.name, clas.posn);        
-            }
-        }
-
+        table.add(clas.name, clas);
+      
         if (secondWalk) {  
-            // parent scope is being set for the case where we have a block inside in the class
             table.newScope(true); 
             table.add ("this", clas);
             for (FieldDecl f: clas.fieldDeclList)
                 f.visit(this, null);
     
             for (MethodDecl m: clas.methodDeclList) {
-                if (table.add(m.name + "function", m)) {
-                    reporter.reportError("duplicate method declaration -  ", m.name, m.posn);
-                }
+                table.add(m.name + "function", m);
             }
             currentClass = clas.name;
             for (MethodDecl m: clas.methodDeclList) {
                 isStaticMethod = false;
         	m.visit(this, null);
             }
-            table.closeScope(true);
         }
         return null;
     }
@@ -87,54 +74,14 @@ public class Identification implements Visitor<String,Object> {
     public Object visitFieldDecl(FieldDecl f, String arg) {
        
         f.type.visit(this, null); 
-        if (table.add(f.name, f)) {
-            reporter.reportError("duplicate class ", f.name, f.posn);
-        }
+        table.add(f.name, f);
         return null;
-    }
-
-    public void visitMainMethodDecl(MethodDecl m)
-    {
-        ParameterDeclList pdl = m.parameterDeclList;
-        ParameterDecl pd = null;
-
-        if (!m.isPublic) {
-            reporter.reportError("Non public definition of main ", "", m.posn);
-        }
-
-        if (!m.isStatic) {
-            reporter.reportError("Non static definition of main ", "", m.posn);
-        }
-        
-        if (pdl.size() > 0)
-            pd = pdl.get(0);
-
-        if ((pdl.size() > 1) || (pdl.size() < 1)) {
-            reporter.reportError("Invalid number of parameters ("+ pdl.size()+ ") in  main method", "", m.posn);
-        } else if (pd.type.typeKind != TypeKind.ARRAY) {
-            reporter.reportError("Invalid parameter type (not Array type) in main method", "", m.type.posn);
-        } else if (((ArrayType) pd.type).eltType.typeKind != TypeKind.CLASS) {
-            reporter.reportError("Invalid parameter type (not class type) in main method", "", m.type.posn);
-        } else if (!(((ClassType)((ArrayType) pd.type).eltType).className.equals("String"))) {
-            reporter.reportError("Invalid parameter type (not String type)in main method", "", m.type.posn);
-        }
-        
     }
     
     public Object visitMethodDecl(MethodDecl m, String arg)
     {
         table.newScope(true); 
         isStaticMethod = m.isStatic;
-
-        if (mainMethodFound && m.name.equals("main")) {
-            reporter.reportError("more than one main method found in the program", m.name, m.posn);
-        }
-
-        if (m.name.equals("main")) {
-            mainMethodFound = true;
-            //visitMainMethodDecl(m);
-        }
-        
         ParameterDeclList pdl = m.parameterDeclList;
         for (ParameterDecl pd: pdl) {
             pd.visit(this, null);
@@ -156,18 +103,14 @@ public class Identification implements Visitor<String,Object> {
     public Object visitParameterDecl(ParameterDecl pd, String arg) 
     {
         pd.type.visit(this, null); 
-        if (table.add(pd.name, pd))  {
-            reporter.reportError("duplicate class ", pd.name, pd.posn);
-        }
+        table.add(pd.name, pd);
         return null;
     } 
     
     public Object visitVarDecl(VarDecl vd, String arg)
     {
         vd.type.visit(this, null);
-        if (table.add(vd.name, vd)) {
-            reporter.reportError("duplicate class ", vd.name, vd.posn);
-        }
+        table.add(vd.name, vd);
         return null;
     }
  
@@ -296,21 +239,20 @@ public class Identification implements Visitor<String,Object> {
         Identifier id = null;
         String name = null, className = null;
         boolean isMethodCall = false, isStatic = false, isPrivate = false;
-        boolean isLocalVar = false;
 
         if ((isMCall != null) && isMCall.equals("true"))
             isMethodCall = true;
 
-        if (qr.thisRelative && isStaticMethod) {
-            reporter.reportError("Non static variable this cannot be referenced " + 
-                                 "from static method", " ", qr.posn);
-            return (qr);
-        } else if (qr.thisRelative){
+        if (qr.thisRelative && !isStaticMethod) {
             id = new Identifier("this", qr.posn);
             id.decl = decl;
             ref = new ThisRef(id, qr.posn);
             ret = ref;
             id = null;
+        } else {
+            reporter.reportError("Non static variable this cannot be referenced from static method",
+                                      " ", qr.posn); 
+            return (qr);
         }
 
         IdentifierList ql = qr.qualifierList;
@@ -321,11 +263,11 @@ public class Identification implements Visitor<String,Object> {
             } else {
                 name = id.spelling;
             }
-           
+
             if ((decl = table.retrieve(name)) != null) {
                 id.decl = decl;
             } else {
-                reporter.reportError("cannot find symbol -", id.spelling, id.posn);
+                reporter.reportError("cannot find symbol - variable-", id.spelling, id.posn);
                 return (qr);
             }
 
@@ -334,11 +276,10 @@ public class Identification implements Visitor<String,Object> {
                 if (level > 2) {
                     ref = new LocalRef(id, qr.posn);
                     classDecl = retrieveClassDecl(decl);
-                    isLocalVar = true;
                 } else if (level == 2) {
                     if (isStaticMethod && !(((MemberDecl)decl).isStatic)) {
-                        reporter.reportError("non static variable ' " + id.spelling + 
-                                             " ' cannot be referenced from a static context ", 
+                        reporter.reportError("non static variable " + id.spelling + 
+                                             " cannot be referenced from a static context ", 
                                              " ", id.posn);
                         return (qr);
                     } 
@@ -361,10 +302,9 @@ public class Identification implements Visitor<String,Object> {
         }
 
         for (int i = 1; i < ql.size(); i++) {
-            isLocalVar = false;
             id = ql.get(i);
             if (classDecl == null) {
-                reporter.reportError("unable to derefence variable-", id.spelling, id.posn);
+                reporter.reportError("unable to derefence - variable-", id.spelling, id.posn);
                 return (qr);
             }
             name = id.spelling;
@@ -373,7 +313,7 @@ public class Identification implements Visitor<String,Object> {
             if (isMethodCall && (i  == (ql.size() - 1))) {
                 decl = retrieveMethodDeclaration(classDecl, name);
             } else {
-                decl = retrieveFieldDeclaration(classDecl, name);
+                decl = retrieveMethodDeclaration(classDecl, name);
             }
 
             if (decl != null) {
@@ -386,8 +326,8 @@ public class Identification implements Visitor<String,Object> {
                 }
                 id.decl = decl;
                 if ((level == 1) && (i == 1) && !isStatic) {
-                    reporter.reportError("non static variable ' " + id.spelling +
-                            "' :cannot be referenced from a static context ",
+                    reporter.reportError("non static variable " + id.spelling +
+                            " cannot be referenced from a static context ",
                             " ", id.posn);
                     return (qr);
                 } 
@@ -400,7 +340,7 @@ public class Identification implements Visitor<String,Object> {
             }    
         }
 
-        if (!isLocalVar && ((MemberDecl) decl).isStatic) {
+        if (((MemberDecl) decl).isStatic) {
             reporter.reportError("PA3 no static access error", id.spelling, id.posn);
             // report error "PA3 no static access error"
         }
@@ -468,7 +408,7 @@ public class Identification implements Visitor<String,Object> {
         return null;
     }
 
-    
+    /**
     public Object visitLocalRef(LocalRef ref, String arg) 
     {
         return null;
@@ -493,63 +433,12 @@ public class Identification implements Visitor<String,Object> {
     {
         return null;
     }
-
-    public ClassDecl addStringClassDef()
+    */
+    public void reportError(String str) 
     {
-        ClassDecl classDecl = null;
-        FieldDeclList fieldDeclList = new FieldDeclList();
-        MethodDeclList methodDeclList = new MethodDeclList();
-        SourcePosition pos = new SourcePosition();
-        classDecl = new ClassDecl("String", fieldDeclList, methodDeclList, pos);
-        return classDecl;
+        // add the code here 
+        System.exit(4);
     }
 
-    public ClassDecl addPrintStreamClassDef()
-    {
-        ParameterDecl paraDecl = null;
-        ClassDecl classDecl = null;
-        FieldDeclList fieldDeclList = new FieldDeclList();
-        MethodDeclList methodDeclList = new MethodDeclList();
-        SourcePosition pos = new SourcePosition();
-    
-        Type typ = new BaseType(TypeKind.VOID, pos);
-        Type typarg = new BaseType(TypeKind.INT, pos);
-        FieldDecl fieldDecl = new FieldDecl(false, false, typ, "println", pos);
-        fieldDecl.isPublic = true;
-        paraDecl = new ParameterDecl(typarg, "n", pos);
-        ParameterDeclList paraList = new ParameterDeclList();
-        paraList.add(paraDecl);
-        MethodDecl decl = new MethodDecl(fieldDecl, paraList, new StatementList(), null, pos);
-        methodDeclList.add(decl);
-        classDecl = new ClassDecl("_PrintStream", fieldDeclList, methodDeclList, pos);
-        return classDecl;
-    }
-
-    public ClassDecl addSystemClassDef(ClassDecl printStreamClass)
-    {
-        ClassDecl classDecl = null;
-        FieldDeclList fieldDeclList = new FieldDeclList();
-        MethodDeclList methodDeclList = new MethodDeclList();
-        SourcePosition pos = new SourcePosition();
-        ClassType typ = new ClassType("_PrintStream", pos);
-        typ.classDecl = printStreamClass;
-        FieldDecl fieldDecl = new FieldDecl(false, true, typ, "out", pos);
-        fieldDecl.isPublic = true;
-        fieldDeclList.add(fieldDecl);
-        classDecl = new ClassDecl("System", fieldDeclList, methodDeclList, pos);
-        return classDecl;
-    }
-
-    public void addStandardImports()
-    {
-        ClassDecl printStreamClass = addPrintStreamClassDef();
-        table.add("_PrintStream", printStreamClass);
-        table.newScope();
-        ClassDecl systemClass = addSystemClassDef(printStreamClass);
-        table.add("System", systemClass);
-        ClassDecl stringClass = addStringClassDef();
-        table.add("String", stringClass);
-
-    }
     
 }

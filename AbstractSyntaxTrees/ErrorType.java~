@@ -1,0 +1,23 @@
+/*
+ * File: ErrorType.java
+ * Author: Rajesh Gopidi
+ * PID:    720367703
+ * Course : COMP520
+ */
+package miniJava.AbstractSyntaxTrees;
+
+import miniJava.SyntacticAnalyzer.SourcePosition;
+
+public class ErrorType extends Type
+{
+    public ErrorType(SourcePosition posn){
+        super(TypeKind.ERROR, posn);
+    }
+        
+    public <A,R> R visit(Visitor<A,R> v, A o) {
+        return v.visitErrorType(this, o);
+    }
+
+    public String className;
+    public ClassDecl classDecl;  // resolved in contextual analysis
+}

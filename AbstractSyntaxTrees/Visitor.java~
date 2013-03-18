@@ -46,13 +46,14 @@ public interface Visitor<ArgType,ResultType> {
   // References
     public ResultType visitQualifiedRef(QualifiedRef ref, ArgType arg);
     public ResultType visitIndexedRef(IndexedRef ref, ArgType arg);
+    /**
     public Reference visitQualifiedRef(QualifiedRef ref);
     public ResultType visitLocalRef(LocalRef ref, ArgType arg);
     public ResultType visitMemberRef(MemberRef ref, ArgType arg);
     public ResultType visitClassRef(ClassRef ref, ArgType arg);
     public ResultType visitThisRef(ThisRef ref, ArgType arg);
     public ResultType visitDeRef(DeRef ref, ArgType arg);
-
+    */
   // Terminals
     public ResultType visitIdentifier(Identifier id, ArgType arg);
     public ResultType visitOperator(Operator op, ArgType arg);

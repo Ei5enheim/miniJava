@@ -19,10 +19,6 @@ public class ClassType extends Type
         return v.visitClassType(this, o);
     }
 
-    public String toString()
-    {
-	return (className);
-    }
     public String className;
     public ClassDecl classDecl;  // resolved in contextual analysis
 }

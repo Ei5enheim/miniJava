@@ -7,10 +7,10 @@ package miniJava.AbstractSyntaxTrees;
 
 import  miniJava.SyntacticAnalyzer.SourcePosition;
 
-public abstract class Expression extends AST {
+public abstract class Statement extends AST {
 
-  public Expression(SourcePosition posn) {
+  public Statement(SourcePosition posn) {
     super (posn);
   }
-  public Type type;
+
 }

@@ -23,5 +23,5 @@ public class BinaryExpr extends Expression
     public Operator operator;
     public Expression left;
     public Expression right;
-    
+    public TypeKind typeKind;
 }

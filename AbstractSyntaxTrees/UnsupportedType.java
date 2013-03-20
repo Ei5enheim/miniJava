@@ -26,9 +26,15 @@ public class UnsupportedType extends Type
 	className = ct.className;
 	classDecl = ct.classDecl;
     }
-
+    
     public <A,R> R visit(Visitor<A,R> v, A o) {
-        return v.visitUnsupportedType(this, o);
+        //return v.visitUnsupportedType(this, o);
+        return null;
+    }
+  
+    public String toString()
+    {
+	return ("unsupportedtype["+className+"]");
     }
 
     public String className;

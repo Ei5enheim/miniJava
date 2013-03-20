@@ -7,19 +7,17 @@ package miniJava.AbstractSyntaxTrees;
 
 import miniJava.SyntacticAnalyzer.SourcePosition;
 
-public class AssignStmt extends Statement
+public class BlockStmt extends Statement
 {
-    public AssignStmt(Reference r, Expression e, SourcePosition posn){
+    public BlockStmt(StatementList sl, SourcePosition posn){
         super(posn);
-        ref = r;
-        val = e;
+        this.sl = sl;
     }
-    
+        
     public <A,R> R visit(Visitor<A,R> v, A o) {
-        return v.visitAssignStmt(this, o);
+        return v.visitBlockStmt(this, o);
     }
-    
-    public Reference ref;
-    public Expression val;
-    
+   
+    public StatementList sl;
+    public TypeKind typeKind;
 }

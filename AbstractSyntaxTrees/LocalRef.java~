@@ -13,7 +13,7 @@ public class LocalRef extends Reference
 {
     public LocalRef (Reference ref, Identifier id,  SourcePosition posn) 
     {
-        super (ref, id, posn);
+        super (id, ref, posn);
         //this.ref = ref;
         //this.id = id;
     }

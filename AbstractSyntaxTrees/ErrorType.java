@@ -13,8 +13,13 @@ public class ErrorType extends Type
     public ErrorType(SourcePosition posn){
         super(TypeKind.ERROR, posn);
     }
-        
+       
     public <A,R> R visit(Visitor<A,R> v, A o) {
-        return v.visitErrorType(this, o);
+        //return v.visitErrorType(this, o);
+        return null;
+    }
+    public String toString()
+    {
+	return ("error");
     }
 }

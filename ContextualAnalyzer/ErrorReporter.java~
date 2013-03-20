@@ -22,7 +22,7 @@ public class ErrorReporter
     
     public void reportError (String msg, String tokenID, SourcePosition psn)
     {
-        System.out.println("***"+ msg + " " + tokenID + ", line number " + psn.getPosition());
+        System.out.println("***"+ msg + " " + tokenID + " in line number " + psn.getPosition());
         errorCount++;
     }
 }

@@ -11,11 +11,11 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class ThisRef extends Reference 
 {
-    public ThisRef (Reference ref, Identifier id,  SourcePosition posn) 
+    public ThisRef (Identifier id, Reference ref, SourcePosition posn) 
     {
-        super(posn);
-        this.ref = ref;
-        this.id = id;
+        super(id, ref, posn);
+        //this.ref = ref;
+        //this.id = id;
     }
 
     public ThisRef (SourcePosition posn) 
@@ -25,21 +25,22 @@ public class ThisRef extends Reference
     
     public ThisRef (Identifier id,  SourcePosition posn)
     {
-        super(posn);
-        this.ref = null;
-        this.id = id;
+        super(id, posn);
+        //this.ref = null;
+        //this.id = id;
     }
     
+    /**
     public void setRef(Reference ref) 
     {
         this.ref = ref;
-    }
+    }*/
 
     public <A,R> R visit(Visitor<A,R> v, A o)
     {
         return v.visitThisRef(this, o);
     }
 
-    public Identifier id;
-    public Reference ref;
+    //public Identifier id;
+    //public Reference ref;
 }

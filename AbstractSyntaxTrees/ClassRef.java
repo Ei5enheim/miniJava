@@ -11,12 +11,6 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class ClassRef extends Reference 
 {
-    public ClassRef (Identifier id, Reference ref, SourcePosition posn) 
-    {
-        super (id, ref, posn);
-        //this.ref = ref;
-        //this.id = id;
-    }
     
     public ClassRef(Identifier id,  SourcePosition posn)
     {
@@ -33,8 +27,7 @@ public class ClassRef extends Reference
 
     public <A,R> R visit(Visitor<A,R> v, A o)
     {
-        return null;
-        //v.visitClassRef(this, o);
+        return (v.visitClassRef(this, o));
     }
 
     //public Identifier id;

@@ -21,13 +21,6 @@ public abstract class Reference extends AST
         	this.id = id;
 	}
 
-    	public Reference (Identifier id, Reference ref, SourcePosition posn) 
-    	{
-        	super (posn);
-        	this.ref = ref;
-        	this.id = id;
-    	}
-
     	public void setRef(Reference ref) 
     	{
         	this.ref = ref;

@@ -21,7 +21,7 @@ public class ArrayType extends Type {
 
 	    public String toString()
 	    {
-		return (eltType.toString()  + "[]");
+		return (eltType.toString() + " " + "Array");
 
 	     }
 

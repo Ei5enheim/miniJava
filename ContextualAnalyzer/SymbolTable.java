@@ -126,6 +126,18 @@ public class SymbolTable
        return (null);
     }
 
+    public Declaration retrieveMemberDecl (String key)
+    {
+        int index = 2;
+        HashMap<String, STEntry> innerTable = null;        
+
+       innerTable = symbolTable.get(index);
+       if (innerTable.containsKey(key)) {
+           return (innerTable.get(key).astNode);
+       } 
+       return (null);
+    }
+
     public int retrieveLevel (String key)
     {
         int index = symbolTable.size() - 1;

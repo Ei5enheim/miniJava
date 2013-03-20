@@ -11,12 +11,7 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class DeRef extends Reference 
 {
-    public DeRef (Identifier id, Reference ref, SourcePosition posn) 
-    {
-        super (id, ref, posn);
-        //this.ref = ref;
-        //this.id = id;
-    }
+
     
     public DeRef(Identifier id,  SourcePosition posn)
     {

@@ -17,7 +17,4 @@ public class ErrorType extends Type
     public <A,R> R visit(Visitor<A,R> v, A o) {
         return v.visitErrorType(this, o);
     }
-
-    public String className;
-    public ClassDecl classDecl;  // resolved in contextual analysis
 }

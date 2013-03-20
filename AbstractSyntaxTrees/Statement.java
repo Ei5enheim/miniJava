@@ -13,4 +13,5 @@ public abstract class Statement extends AST {
     super (posn);
   }
 
+  public Type type;
 }

@@ -11,12 +11,6 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 
 public class ThisRef extends Reference 
 {
-    public ThisRef (Identifier id, Reference ref, SourcePosition posn) 
-    {
-        super(id, ref, posn);
-        //this.ref = ref;
-        //this.id = id;
-    }
 
     public ThisRef (SourcePosition posn) 
     {

@@ -17,7 +17,7 @@ public class SymbolTable
     protected int level;
     protected int parentScope;
     private static final int symbolTableSize = 20; 
-    private boolean debug  = true;
+    private boolean debug  = false;
 
     public SymbolTable()
     {

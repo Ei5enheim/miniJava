@@ -13,7 +13,7 @@ import miniJava.AbstractSyntaxTrees.Package;
 public class Identification implements Visitor<String,Object> {
 	
     public boolean showPosition = false;
-    private boolean secondWalk = false, debug = true;
+    private boolean secondWalk = false, debug = false;
     private SymbolTable table;
     private boolean isStaticMethod = false, mainMethodFound = false;
     private String currentClass = null;

@@ -906,8 +906,7 @@ public class Parser
 
     public void parseError(String str) 
     {
-        if (debug)
-            System.out.println("Parse Error, " + str);
+        System.out.println("Parse Error, " + str);
         System.exit(4);
     }
 }

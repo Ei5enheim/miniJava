@@ -18,7 +18,7 @@ public class Checker implements Visitor<Object,Type>
     private final BaseType intType;
     private final BaseType voidType;
     private final BaseType declType;
-    private boolean debug = true, isThisObjRef = false;
+    private boolean debug = false, isThisObjRef = false;
     private final SourcePosition pos = new SourcePosition();
 
     public Checker() 

@@ -77,8 +77,11 @@ public class Identification implements Visitor<String,Object> {
                 f.visit(this, null);
     
             for (MethodDecl m: clas.methodDeclList) {
-                if (table.add(m.name + "function", m)) {
-                    reporter.reportError("Method "+ m.name+" is already defined", "", m.posn);
+                if ((table.retrieveMemberDecl(m.name) != null) ||
+                    (table.retrieveMemberDecl(m.name+"function") != null)) {
+                    reporter.reportError(m.name+" is already defined in the class", "", m.posn);
+                }  else if (table.add(m.name+"function", m)) {
+                    reporter.reportError("Method" +m.name+" is already defined in the class", "", m.posn);
                 }
             }
             currentClass = clas.name;
@@ -139,30 +142,35 @@ public class Identification implements Visitor<String,Object> {
         ParameterDecl pd = null;
 
         if (!m.isPublic) {
-            reporter.reportError("Non public definition of main ", "", m.posn);
+            return;
         }
 
         if (!m.isStatic) {
-            reporter.reportError("Non static definition of main ", "", m.posn);
+            return;
         }
 
         if (m.type.typeKind != TypeKind.VOID) {
-            reporter.reportError("Illegal return type for main method, found "+
-                                 m.type.toString()+" but expected void", "", m.posn);
+	    return;
         }
         
         if (pdl.size() > 0)
             pd = pdl.get(0);
 
         if ((pdl.size() > 1) || (pdl.size() < 1)) {
-            reporter.reportError("Invalid number of parameters ("+ pdl.size()+ ") in  main method", "", m.posn);
+            return;
         } else if (pd.type.typeKind != TypeKind.ARRAY) {
-            reporter.reportError("Invalid parameter type in main method", "", m.type.posn);
+            return;
         } else if (((ArrayType) pd.type).eltType.typeKind != TypeKind.CLASS) {
-            reporter.reportError("Invalid parameter type in main method", "", m.type.posn);
+            return;
         } else if (!(((ClassType)((ArrayType) pd.type).eltType).className.equals("String"))) {
-            reporter.reportError("Invalid parameter type in main method", "", m.type.posn);
+            return;
         }
+	
+        if (mainMethodFound) {
+            reporter.reportError("More than one public static void main (String[] args) method found in the program",
+				 "", m.posn);
+        }
+	mainMethodFound = true;
         
     }
     
@@ -171,18 +179,12 @@ public class Identification implements Visitor<String,Object> {
         table.newScope(true); 
         isStaticMethod = m.isStatic;
 
-        if (mainMethodFound && m.name.equals("main")) {
-            reporter.reportError("more than one main method found in the program", m.name, m.posn);
-        }
-
         if (m.name.equals("main")) {
-            mainMethodFound = true;
-            visitMainMethodDecl(m);
-        } else {
-            // checking for return type;       
-            m.type.visit(this,null); 
-        }
-
+           visitMainMethodDecl(m);
+        } 
+        // checking for return type;       
+        m.type.visit(this,null); 
+        
         ParameterDeclList pdl = m.parameterDeclList;
         for (ParameterDecl pd: pdl) {
             pd.visit(this, null);

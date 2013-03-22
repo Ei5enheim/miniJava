@@ -39,7 +39,7 @@ public class Identification implements Visitor<String,Object> {
         ast.visit(this,null);
         // done with this check
         if (!mainMethodFound) {
-            reporter.reportError("No definition of main found in the program", "", ast.posn);
+            reporter.reportError("No definition of required main found in the program", "", ast.posn);
         }
         if (reporter.errorCount > 0)
             System.exit(4);
@@ -341,7 +341,7 @@ public class Identification implements Visitor<String,Object> {
     
     public Object visitQualifiedRef(QualifiedRef qr, String isMCall)
     {
-        Reference ref = null, ret = null;
+        Reference ref = null;
         Declaration decl = null, classDecl = null;        
         int level = -1;
         Identifier id = null;
@@ -362,12 +362,8 @@ public class Identification implements Visitor<String,Object> {
 		reporter.reportError("cannot find symbol - method-", "this", qr.posn);
                 return (qr);
 	    }
-            id = new Identifier("this", qr.posn);
 	    decl = table.retrieve(currentClass);
-            id.decl = decl;
-            ref = new ThisRef(id, qr.posn);
-            ret = ref;
-            id = null;
+            ref = new ThisRef((ClassDecl) decl, qr.posn);
         }
 
         if (ql.size() > 0) {
@@ -380,9 +376,7 @@ public class Identification implements Visitor<String,Object> {
                 name = id.spelling;
             }
            
-            if ((decl = table.retrieve(name)) != null) {
-                id.decl = decl;
-            } else {
+            if ((decl = table.retrieve(name)) == null) {
                 reporter.reportError("cannot find symbol -", id.spelling, id.posn);
                 return (qr);
             }
@@ -392,7 +386,7 @@ public class Identification implements Visitor<String,Object> {
             }
             if (ref == null) {   
                 if (level > 2) {
-                    ref = new LocalRef(id, qr.posn);
+                    ref = new LocalRef((LocalDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
                     isLocalVar = true;
                 } else if (level == 2) {
@@ -402,25 +396,21 @@ public class Identification implements Visitor<String,Object> {
                                              " ", id.posn);
                         return (qr);
                     } 
-                    ref = new MemberRef(id, qr.posn);
+                    ref = new MemberRef((MemberDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
                 } else if ((level == 1) && (ql.size() != 1)) {
-                    ref = new ClassRef(id, qr.posn);
+                    ref = new ClassRef((ClassDecl) decl, qr.posn);
                     classDecl = decl;
                 } else {
                     reporter.reportError("cannot find symbol - variable ", id.spelling, id.posn);
                     return (qr);
                 }
-                ret = ref;
             } else {
-                if ((decl = table.retrieveMemberDecl(name)) != null) {
-                    id.decl = decl;
-                } else {
+                if ((decl = table.retrieveMemberDecl(name)) == null) {
                     reporter.reportError("cannot find symbol -", id.spelling, id.posn);
                     return (qr);
                 }
-                ref.ref = new DeRef(id, id.posn);
-                ref = ref.ref; 
+                ((ThisRef)ref).setMemberDecl((MemberDecl)decl);
                 classDecl = retrieveClassDecl(decl);
             }      
         }
@@ -453,16 +443,13 @@ public class Identification implements Visitor<String,Object> {
                     reporter.reportError(id.spelling + " has private access in ", className, id.posn);
                     return (qr);
                 }
-                id.decl = decl;
                 if ((level == 1) && (i == 1) && !isStatic) {
                     reporter.reportError("non static variable ' " + id.spelling +
                             "' :cannot be referenced from a static context ",
                             " ", id.posn);
                     return (qr);
                 } 
-                ref.ref = new DeRef(id, id.posn);
-                ref = ref.ref;
-
+                ref = new DeRef(ref, (MemberDecl)decl, id.posn);
                 classDecl = retrieveClassDecl(decl);
             } else {
                 reporter.reportError("cannot find symbol - variable-", id.spelling, id.posn);
@@ -475,7 +462,7 @@ public class Identification implements Visitor<String,Object> {
             reporter.reportError("PA3 no static access error", id.spelling, id.posn);
             // report error "PA3 no static access error"
         }
-        return ret;
+        return ref;
     }
 
     public ClassDecl retrieveClassDecl (Declaration decl)

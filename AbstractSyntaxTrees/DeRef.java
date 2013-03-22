@@ -13,24 +13,42 @@ public class DeRef extends Reference
 {
 
     
-    public DeRef(Identifier id,  SourcePosition posn)
+    public DeRef(Reference ref, MemberDecl decl, SourcePosition posn)
     {
-        super (id, posn);
-        //this.ref = null;
-        //this.id = id;
+        super (posn);
+        this.ref = ref;
+        this.decl = decl;
+    }
+
+    public DeRef(MemberDecl decl, SourcePosition posn)
+    {
+        super (posn);
+        this.ref = null;
+        this.decl = decl;
+    }
+
+    public DeRef(SourcePosition posn)
+    {
+        super (posn);
+        this.ref = null;
+        this.decl = null;
     }
     
-    /**
+    public void setDecl(MemberDecl decl) 
+    {
+        this.decl = decl;
+    }
+    
     public void setRef(Reference ref) 
     {
         this.ref = ref;
-    }*/
+    }
 
     public <A,R> R visit(Visitor<A,R> v, A o)
     {
         return v.visitDeRef(this, o);
     }
 
-    //public Identifier id;
-    //public Reference ref;
+    public MemberDecl decl ;
+    public Reference ref;
 }

@@ -12,24 +12,27 @@ import miniJava.SyntacticAnalyzer.SourcePosition;
 public class MemberRef extends Reference 
 {
 
-    public MemberRef(Identifier id,  SourcePosition posn)
+    public MemberRef(MemberDecl decl,  SourcePosition posn)
     {
-        super(id, posn);
-        //this.ref = null;
-        //this.id = id;
+        super(posn);
+        this.decl = decl;
+    }
+
+    public MemberRef(SourcePosition posn)
+    {
+        super(posn);
+        this.decl = null;
     }
     
-    /**
-    public void setRef(Reference ref) 
+    public void setDecl(MemberDecl decl) 
     {
-        this.ref = ref;
-    }*/
+        this.decl = decl;
+    }
 
     public <A,R> R visit(Visitor<A,R> v, A o)
     {
         return v.visitMemberRef(this, o);
     }
 
-    //public Identifier id;
-    //public Reference ref;
+    public MemberDecl decl;
 }

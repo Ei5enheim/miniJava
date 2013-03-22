@@ -97,7 +97,7 @@ public class Checker implements Visitor<Object,Type>
             {      
                 if (type.typeKind != TypeKind.ERROR)
                     reporter.reportError("Incompatible types - found " +type.toString()+
-                                        " but expected " + m.type.toString(), m.name, m.posn);
+                                        " but expected " + m.type.toString(), "", m.posn);
             }
         } else {
             if (m.type.typeKind != TypeKind.VOID) {
@@ -295,7 +295,7 @@ public class Checker implements Visitor<Object,Type>
                                  " but expected "+ intType.toString(), "",
                                  expr.sizeExpr.posn);
         }
-
+        type1.visit(this, null);
         type1 = new ArrayType(type1, expr.posn);
         return type1;
     }
@@ -303,6 +303,7 @@ public class Checker implements Visitor<Object,Type>
     public Type visitNewObjectExpr(NewObjectExpr expr, Object arg)
 
     {
+        expr.classtype.visit(this,null);
         return (expr.classtype);
     }
 
@@ -351,7 +352,8 @@ public class Checker implements Visitor<Object,Type>
         }
 
         if ((type1.typeKind != TypeKind.ARRAY) && !cond) {
-            reporter.reportError("array required, but found "+
+            if (type1.typeKind != TypeKind.ERROR)
+                reporter.reportError("array required, but found "+
                                  type1.toString(), "", ir.posn);
             cond = true;
         }
@@ -479,111 +481,91 @@ public class Checker implements Visitor<Object,Type>
     public Type visitLocalRef(LocalRef ref, Object arg) 
     {
         Type type = null;
-        Reference deRef = ref;
 
         if (debug)
             System.out.println("In local reference");
 
-        while (deRef.ref != null)
-            deRef = deRef.ref;
+        type = ref.decl.type;
 
-        if (arg == null) {
-            type = deRef.id.decl.type;
-            if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + deRef.id.spelling +
-                "] of unsupported type", "", deRef.id.posn);
-                return (errorType);
-            }
-        } else {
-            checkArgList((MethodDecl)deRef.id.decl, (ExprList)arg, ref.id.posn);
-            type = ((MethodDecl) deRef.id.decl).type;
+        if (isUnsupportedType(type)) {
+            reporter.reportError("reference to symbol [" + ref.decl.name +
+                    "] of unsupported type", "", ref.posn);
+            return (errorType);
         }
         return (type);
     }
 
     public Type visitMemberRef(MemberRef ref, Object arg)
     {
-
         Type type = null;
-        Reference deRef = ref;
 
         if (debug)
             System.out.println("In member reference");
 
-        while (deRef.ref != null)
-            deRef = deRef.ref;
-
         if (arg == null) {
-            type = deRef.id.decl.type;
+            type = ref.decl.type;
             if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + deRef.id.spelling +
-                "] of unsupported type", "", deRef.id.posn);
+                reporter.reportError("reference to symbol [" + ref.decl.name +
+                "] of unsupported type", "", ref.posn);
                 return (errorType);
             }
         } else {
-            checkArgList((MethodDecl)deRef.id.decl, (ExprList)arg, ref.id.posn);
-            type = ((MethodDecl) deRef.id.decl).type;
+            checkArgList((MethodDecl)ref.decl, (ExprList)arg, ref.posn);
+            type = ((MethodDecl) ref.decl).type;
         }
         return (type);
     }
 
     public Type visitClassRef(ClassRef ref, Object arg)
     {
-        Type type = null;
-        Reference deRef = ref;
-
         if (debug)
             System.out.println("In class reference");
 
-        while (deRef.ref != null) {
-            deRef = deRef.ref;
-        }
-
-        if (arg == null) {
-            type = deRef.id.decl.type;
-            if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + deRef.id.spelling +
-                "] of unsupported type", "", deRef.id.posn);
-                return (errorType);
-            }
-        } else {
-            if (debug)
-                System.out.println("checking arguments for the method-"+deRef.id.spelling);
-            checkArgList((MethodDecl)deRef.id.decl, (ExprList)arg, ref.id.posn);
-            type = ((MethodDecl) deRef.id.decl).type;
-        }
-        return (type);
+        return (new ClassType(ref.decl.name, pos));
     }
 
     public Type visitThisRef(ThisRef ref, Object arg)
     {
         Type type = null;
-        Reference deRef = ref;
         
-        if (deRef.ref == null) {
+        if (ref.decl == null) {
             isThisObjRef = true;
-            return (new ClassType(((ClassDecl)deRef.id.decl).name, deRef.id.posn));
+            return (new ClassType(ref.cdecl.name, ref.posn));
         }
-        while (deRef.ref != null)
-            deRef = deRef.ref;
 
         if (arg == null) {
-            type = deRef.id.decl.type;
+            type = ref.decl.type;
             if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + deRef.id.spelling +
-                "] of unsupported type", "", deRef.id.posn);
+                reporter.reportError("reference to symbol [" + ref.decl.name +
+                "] of unsupported type", "", ref.posn);
                 return (errorType);
             }
         } else {
-            checkArgList((MethodDecl) deRef.id.decl, (ExprList)arg, ref.id.posn);
-            type = ((MethodDecl) deRef.id.decl).type;
+            checkArgList((MethodDecl) ref.decl, (ExprList)arg, ref.posn);
+            type = ((MethodDecl) ref.decl).type;
         }
         return (type);
     }
 
     public Type visitDeRef(DeRef ref, Object arg)
     {
-        return null;
+        Type type = null;
+
+        if (debug)
+            System.out.println("In Dereference");
+
+        if (arg == null) {
+            type = ref.decl.type;
+            if (isUnsupportedType(type)) {
+                reporter.reportError("reference to symbol [" + ref.decl.name +
+                "] of unsupported type", "", ref.posn);
+                return (errorType);
+            }
+        } else {
+            checkArgList((MethodDecl)ref.decl, (ExprList)arg, ref.posn);
+            type = ((MethodDecl) ref.decl).type;
+        }
+        return (type);
     }
 
     public boolean checkArgList (MethodDecl decl, ExprList argList, SourcePosition posn)
@@ -632,27 +614,34 @@ public class Checker implements Visitor<Object,Type>
 
         if ((type1.typeKind != TypeKind.ARRAY) &&
             (type2.typeKind != TypeKind.ARRAY)) {
+            //System.out.println("not an array");
             if ((type1.typeKind != TypeKind.CLASS) &&
                 (type2.typeKind != TypeKind.CLASS)) {
-                if ((checkTypes(type1, type2, TypeKind.INT)) ||
-                    (checkTypes(type1, type2, TypeKind.BOOLEAN)) ||
-                    (checkTypes(type1, type2, TypeKind.VOID))) {
-                    return (true);
+                //System.out.println("not a class");
+                if ((type1.typeKind != TypeKind.UNSUPPORTED) &&
+                    (type2.typeKind != TypeKind.UNSUPPORTED)) {
+                    //System.out.println("not a class");
+                    if ((checkTypes(type1, type2, TypeKind.INT)) ||
+                        (checkTypes(type1, type2, TypeKind.BOOLEAN)) ||
+                        (checkTypes(type1, type2, TypeKind.VOID))) {
+                        return (true);
+                    }
+                } else if ((type1.typeKind == TypeKind.UNSUPPORTED) &&
+                           (type2.typeKind == TypeKind.UNSUPPORTED)) {
+                            //System.out.println("unsupported type");
+                        if (checkClassTypes(type1, type2)) {
+                            return (true);
+                        }
                 }
             } else if ((type1.typeKind == TypeKind.CLASS) &&
                        (type2.typeKind == TypeKind.CLASS)) {
-                if (checkClassTypes(type1, type2)) {
-                    return (true);
-                }
-            } else if ((type1.typeKind == TypeKind.UNSUPPORTED) &&
-                       (type2.typeKind == TypeKind.UNSUPPORTED)) {
+                //System.out.println("ifuck you!");
                 if (checkClassTypes(type1, type2)) {
                     return (true);
                 }
             }
         } else if ((type1.typeKind == TypeKind.ARRAY) &&
                    (type2.typeKind == TypeKind.ARRAY)) {
-                    System.out.println("Array match");
             if (checkArrayTypes(type1, type2)) {
                 return (true);
             }
@@ -666,7 +655,7 @@ public class Checker implements Visitor<Object,Type>
         ClassType typeb = (ClassType) type2;
 
         if (typea.className.equals(typeb.className)) {
-            System.out.println("returning true for classname "+ typeb.className);
+            //System.out.println("returning true for classname "+ typeb.className);
             return true;
         }
         return false;
@@ -679,7 +668,6 @@ public class Checker implements Visitor<Object,Type>
 
         if ((typea.typeKind == TypeKind.CLASS) &&
             (typeb.typeKind == TypeKind.CLASS)) {
-            System.out.println("class type found in array");
             if (checkClassTypes(typea, typeb)) {
                 return true;
             }

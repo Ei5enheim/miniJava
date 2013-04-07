@@ -26,7 +26,7 @@ public class SourceFile
     /* A variable to keep track of the line number of
      * character being scanned from the source file.
      */
-    private int currentlineNum;
+    private int currentlineNum = 1;
 
     public SourceFile()
     {

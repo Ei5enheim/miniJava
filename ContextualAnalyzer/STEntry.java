@@ -13,11 +13,12 @@ public class STEntry
 {
     protected Declaration astNode;
     protected STEntry next; 
-
+   
     public STEntry (Declaration decl, STEntry next)
     {
 
         this.astNode = decl;
         this.next  = next;
     }
+
 }

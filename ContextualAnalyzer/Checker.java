@@ -65,11 +65,11 @@ public class Checker implements Visitor<Object,Type>
     {
         f.type.visit(this, null);
         if (f.type.typeKind == TypeKind.VOID) {
-            reporter.reportError("'(' Expected", "", f.posn);
+            reporter.reportError("cannot declare field with type void", "", f.posn);
             return errorType;
         } else if (f.type.typeKind == TypeKind.ARRAY){
             if (f.type.visit(this, null).typeKind == TypeKind.VOID) {
-                reporter.reportError("'(' Expected", "", f.posn);
+                reporter.reportError("cannot declare field with type void", "", f.posn);
                 return errorType;
             }
         }
@@ -206,18 +206,20 @@ public class Checker implements Visitor<Object,Type>
 
         if ((type1.typeKind != TypeKind.BOOLEAN) &&
             (type1.typeKind != TypeKind.ERROR)) {
-            reporter.reportError("Incompatible types - found "+ type2.toString()+
+            reporter.reportError("Incompatible types - found "+ type1.toString()+
                                  " but expected "+ booleanType.toString(), "", stmt.cond.posn);
         }
         type2 = stmt.thenStmt.visit(this, null);
         if (type2.typeKind == TypeKind.DECLARATION)
-            reporter.reportError("Not a valid Statement ", "", stmt.thenStmt.posn);
+            reporter.reportError("Variable declaration as solitary statement in an arm of a conditional construct", 
+                                 "", stmt.thenStmt.posn);
 
         if (stmt.elseStmt != null) 
         {
            type2 =  stmt.elseStmt.visit(this, null);
             if (type2.typeKind == TypeKind.DECLARATION)
-                reporter.reportError("Not a valid Statement ", "", stmt.elseStmt.posn);
+                reporter.reportError("Variable declaration as solitary statement in an arm of a conditional construct", 
+                                     "", stmt.elseStmt.posn);
         }
         return (voidType);
     }
@@ -229,14 +231,14 @@ public class Checker implements Visitor<Object,Type>
         type1 = stmt.cond.visit(this, null);
         if ((type1.typeKind != TypeKind.BOOLEAN) &&
             (type1.typeKind != TypeKind.ERROR)) {
-            reporter.reportError("Incompatible types - found "+ type2.toString()+
+            reporter.reportError("Incompatible types - found "+ type1.toString()+
                                  " but expected "+ booleanType.toString(), "", stmt.cond.posn);
         }
 
         type2 = stmt.body.visit(this, null);
         if (type2.typeKind == TypeKind.DECLARATION)
-            reporter.reportError("Not a valid Statement ", "", stmt.body.posn);
-
+            reporter.reportError("variable declaration as solitary statement in the body of the while construct", 
+                                 "", stmt.body.posn);
         return voidType;
     }
     
@@ -488,8 +490,8 @@ public class Checker implements Visitor<Object,Type>
         type = ref.decl.type;
 
         if (isUnsupportedType(type)) {
-            reporter.reportError("reference to symbol [" + ref.decl.name +
-                    "] of unsupported type", "", ref.posn);
+            reporter.reportError("reference to symbol '" + ref.decl.name +
+                    "' of unsupported type", "", ref.posn);
             return (errorType);
         }
         return (type);
@@ -505,8 +507,8 @@ public class Checker implements Visitor<Object,Type>
         if (arg == null) {
             type = ref.decl.type;
             if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + ref.decl.name +
-                "] of unsupported type", "", ref.posn);
+                reporter.reportError("reference to symbol '" + ref.decl.name +
+                "' of unsupported type", "", ref.posn);
                 return (errorType);
             }
         } else {
@@ -536,8 +538,8 @@ public class Checker implements Visitor<Object,Type>
         if (arg == null) {
             type = ref.decl.type;
             if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + ref.decl.name +
-                "] of unsupported type", "", ref.posn);
+                reporter.reportError("reference to symbol '" + ref.decl.name +
+                "' of unsupported type", "", ref.posn);
                 return (errorType);
             }
         } else {
@@ -557,8 +559,8 @@ public class Checker implements Visitor<Object,Type>
         if (arg == null) {
             type = ref.decl.type;
             if (isUnsupportedType(type)) {
-                reporter.reportError("reference to symbol [" + ref.decl.name +
-                "] of unsupported type", "", ref.posn);
+                reporter.reportError("reference to symbol '" + ref.decl.name +
+                "' of unsupported type", "", ref.posn);
                 return (errorType);
             }
         } else {

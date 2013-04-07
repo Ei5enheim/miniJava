@@ -46,7 +46,8 @@ public class Scanner
     public static final int SCANAHEAD = 1;
     public static final int NOTACOMMENT = 0;
     public static final int UNDISCLOSEDCOMM = 2;
-    public boolean debug = false;       
+    public boolean debug = false;
+    SourcePosition pos = null;
  
     public Scanner() 
     {
@@ -75,8 +76,9 @@ public class Scanner
         int kind = -1;
         Integer obj = null;
         buffer = new StringBuffer();
-        // retrieving the line number of the current token in the source file
-        SourcePosition pos = new SourcePosition(source.getCurrentlineNum());
+        
+        // reseting the pos reference to null
+        pos = null;
         // calling the scanner to scan the input file.
         kind = scan(false);
         pos.setFinish(source.getCurrentlineNum());
@@ -103,8 +105,10 @@ public class Scanner
         int kind = -1;
         Integer obj = null;
         buffer = new StringBuffer();
-        // retrieving the line number of the current token in the source file
-        SourcePosition pos = new SourcePosition(source.getCurrentlineNum());
+
+        // reseting the pos reference to null
+        pos = null;
+
         // calling the scanner to scan the input file.
         kind = scan(scanWhitespace);
         pos.setFinish(source.getCurrentlineNum());
@@ -231,6 +235,7 @@ public class Scanner
     {
         boolean return_val;
         return_val = scanWhiteSpaceChars(); 
+        pos = new SourcePosition(source.getCurrentlineNum());
         if (scanWhitespace) {
             if (return_val)
                 return (Keywords.WHITESPACE);

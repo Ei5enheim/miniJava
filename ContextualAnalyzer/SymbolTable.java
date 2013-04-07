@@ -22,7 +22,6 @@ public class SymbolTable
     public SymbolTable()
     {
         parentScope = -1;
-        // level = 0 is reserved for keywords
         level = -1;
         symbolTable = new ArrayList<HashMap<String, STEntry>>(symbolTableSize);
     }
@@ -64,7 +63,7 @@ public class SymbolTable
     {
         symbolTable.remove(level);
         level--;
-        if (resetParentScope && level < 2)
+        if (resetParentScope && level < MEMBERLEVEL)
             parentScope = -1;
 	else if (resetParentScope)
 	    parentScope = level;
@@ -76,21 +75,21 @@ public class SymbolTable
     {
         HashMap<String, STEntry> innerTable = symbolTable.get(level);
         HashMap<String, STEntry> parentTable = null; 
-        HashMap<String, STEntry> keywords = symbolTable.get(0);
         STEntry entry = null;
-
-        if (keywords.containsKey(key)) {
-            // need to change this and add a Error and return
-            return (true);
-        }
-        if (level > parentScope && (parentScope != -1)) {
-            parentTable = symbolTable.get(parentScope);
-	    return (parentTable.containsKey(key));
-	}
-
+        
         if (innerTable.containsKey(key)) {
             return (true);
-        } 
+        }
+
+        if (level > parentScope && (parentScope != -1)) {
+            int index = level-1;
+            while (index >= parentScope) {
+                parentTable = symbolTable.get(index);
+                if (parentTable.containsKey(key))
+                    return (true);
+                index--;
+            }
+	}
 
         entry = new STEntry(decl, null);
         innerTable.put(key, entry);
@@ -103,7 +102,7 @@ public class SymbolTable
         int index = symbolTable.size() - 1;
         HashMap<String, STEntry> innerTable = null;        
 
-        while (index > 0) {
+        while (index >= 0) {
             innerTable = symbolTable.get(index);
             if (innerTable.containsKey(key)) {
                 return (innerTable.get(key).astNode);
@@ -116,19 +115,25 @@ public class SymbolTable
 
     public Declaration retrieveClassDecl (String key)
     {
-        int index = 1;
         HashMap<String, STEntry> innerTable = null;        
 
-       innerTable = symbolTable.get(index);
+       innerTable = symbolTable.get(CLASSLEVEL);
+
        if (innerTable.containsKey(key)) {
            return (innerTable.get(key).astNode);
-       } 
+       }
+ 
+       innerTable = symbolTable.get(PREDEFINEDLEVEL);
+
+       if (innerTable.containsKey(key)) {
+	   return (innerTable.get(key).astNode);
+       }
        return (null);
     }
 
     public Declaration retrieveMemberDecl (String key)
     {
-        int index = 2;
+        int index = MEMBERLEVEL;
         HashMap<String, STEntry> innerTable = null;        
 
        innerTable = symbolTable.get(index);
@@ -143,7 +148,7 @@ public class SymbolTable
         int index = symbolTable.size() - 1;
         HashMap<String, STEntry> innerTable = null;
 
-        while (index > 0) {
+        while (index >= 0) {
             innerTable = symbolTable.get(index);
             if (innerTable.containsKey(key)) {
                 return (index);
@@ -153,6 +158,10 @@ public class SymbolTable
         }
         return (-1);
     }
+    
+    public static final int CLASSLEVEL = 1;
+    public static final int PREDEFINEDLEVEL = 0;
+    public static final int MEMBERLEVEL = 2;
 }
 
 

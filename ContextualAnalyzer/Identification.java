@@ -4,6 +4,7 @@
  * PID:     720367703
  * Course : COMP520
  */
+
 package miniJava.ContextualAnalyzer;
 
 import miniJava.AbstractSyntaxTrees.*;
@@ -12,34 +13,42 @@ import miniJava.AbstractSyntaxTrees.Package;
 
 public class Identification implements Visitor<String,Object> {
 	
-    public boolean showPosition = false;
     private boolean secondWalk = false, debug = false;
     private SymbolTable table;
-    private boolean isStaticMethod = false, mainMethodFound = false;
+    private boolean isStaticMethod = false, mainMethodFound = false, userDefinedStringClass = false;
     private String currentClass = null;
     private ErrorReporter reporter;
+    private VarDecl lVariable = null;
     
     public Identification() 
     {
         // we are going to use the same table for both walks as 
-        // everything added in the first walk will be removed
+        // everything is added in the first walk will be removed
         table = new SymbolTable();
         reporter = new ErrorReporter();
-        // add the standard env here and do not forget to increment the level
+        // adding the standard environment in the zero level
         table.newScope();
-	table.newScope();
         addStandardImports();
+	table.newScope();
     }
 
     public void Identify (AST ast)
     {
         // need to add the standard environment code here
         ast.visit(this, null);
+        if (table.retrieveLevel("String") != SymbolTable.PREDEFINEDLEVEL) {
+            userDefinedStringClass = true;
+        }
         secondWalk = true;
         ast.visit(this,null);
         // done with this check
         if (!mainMethodFound) {
-            reporter.reportError("No definition of required main found in the program", "", ast.posn);
+            if (userDefinedStringClass)
+                reporter.reportError("public static void main (String[] args) method found, but" + 
+                                     "parameter is not of default String type", "", ast.posn);
+            else 
+                reporter.reportError("No valid definition of public static void main (String[] args) found ",
+                                     "", ast.posn);
         }
         if (reporter.errorCount > 0)
             System.exit(4);
@@ -164,12 +173,15 @@ public class Identification implements Visitor<String,Object> {
             return;
         } else if (!(((ClassType)((ArrayType) pd.type).eltType).className.equals("String"))) {
             return;
+        } else if (userDefinedStringClass) {
+            return;
         }
 	
         if (mainMethodFound) {
             reporter.reportError("More than one public static void main (String[] args) method found in the program",
 				 "", m.posn);
         }
+        
 	mainMethodFound = true;
         
     }
@@ -219,6 +231,7 @@ public class Identification implements Visitor<String,Object> {
             reporter.reportError(vd.name+" is already defined in the method ", 
                                  "", vd.posn);
         }
+        lVariable = vd;
         return null;
     }
  
@@ -234,11 +247,12 @@ public class Identification implements Visitor<String,Object> {
         return null;
     }
     
-    public Object visitVardeclStmt(VarDeclStmt stmt, String arg){
-        
+    public Object visitVardeclStmt(VarDeclStmt stmt, String arg)
+    {
+        stmt.varDecl.visit(this, null);    
         if (stmt.initExp != null)
             stmt.initExp.visit(this, null);
-        stmt.varDecl.visit(this, null);
+        lVariable = null;
         return null;
     }
     
@@ -338,6 +352,7 @@ public class Identification implements Visitor<String,Object> {
     }    
    
   // References
+  // store the type in reference class
     
     public Object visitQualifiedRef(QualifiedRef qr, String isMCall)
     {
@@ -385,11 +400,16 @@ public class Identification implements Visitor<String,Object> {
                 System.out.println("level = " + level + " of id = "+ id.spelling );
             }
             if (ref == null) {   
-                if (level > 2) {
+                if (level > SymbolTable.MEMBERLEVEL) {
+                    if (decl == lVariable) {
+                        reporter.reportError("usage of uninitialized variable-'" + id.spelling +
+                                             "'", " ", id.posn);
+                        return (qr);
+                    }
                     ref = new LocalRef((LocalDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
                     isLocalVar = true;
-                } else if (level == 2) {
+                } else if (level == SymbolTable.MEMBERLEVEL) {
                     if (isStaticMethod && !(((MemberDecl)decl).isStatic)) {
                         reporter.reportError("non static variable ' " + id.spelling + 
                                              " ' cannot be referenced from a static context ", 
@@ -398,7 +418,9 @@ public class Identification implements Visitor<String,Object> {
                     } 
                     ref = new MemberRef((MemberDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
-                } else if ((level == 1) && (ql.size() != 1)) {
+                } else if (((level == SymbolTable.CLASSLEVEL) || 
+                            (level == SymbolTable.PREDEFINEDLEVEL)) && 
+                           (ql.size() != 1)) {
                     ref = new ClassRef((ClassDecl) decl, qr.posn);
                     classDecl = decl;
                 } else {
@@ -443,7 +465,9 @@ public class Identification implements Visitor<String,Object> {
                     reporter.reportError(id.spelling + " has private access in ", className, id.posn);
                     return (qr);
                 }
-                if ((level == 1) && (i == 1) && !isStatic) {
+                if (((level == SymbolTable.CLASSLEVEL) ||
+                     (level == SymbolTable.PREDEFINEDLEVEL)) && 
+                    (i == 1) && !isStatic) {
                     reporter.reportError("non static variable ' " + id.spelling +
                             "' :cannot be referenced from a static context ",
                             " ", id.posn);
@@ -452,7 +476,8 @@ public class Identification implements Visitor<String,Object> {
                 ref = new DeRef(ref, (MemberDecl)decl, id.posn);
                 classDecl = retrieveClassDecl(decl);
             } else {
-                reporter.reportError("cannot find symbol - variable-", id.spelling, id.posn);
+                reporter.reportError("cannot find symbol - variable- " + id.spelling +
+                                     " in class: " + className, "", id.posn);
                 return (qr);
             }    
         }

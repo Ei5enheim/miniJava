@@ -14,6 +14,7 @@ public abstract class Declaration extends AST {
 		super(posn);
 		this.name = name;
 		this.type = type;
+		storage = new FieldAddress();
 	}
 	
 	public String name;

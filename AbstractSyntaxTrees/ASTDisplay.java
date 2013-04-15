@@ -295,6 +295,11 @@ public class ASTDisplay implements Visitor<String,Object> {
     {
         return null;
     }
+	
+    public Object  visitArrayLengthRef(ArrayLengthRef ref, String arg)
+    {
+        return null;
+    }
 
     public Object visitClassRef(ClassRef ref, String arg) 
     {

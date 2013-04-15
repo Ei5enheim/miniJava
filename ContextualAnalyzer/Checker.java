@@ -18,7 +18,7 @@ public class Checker implements Visitor<Object,Type>
     private final BaseType intType;
     private final BaseType voidType;
     private final BaseType declType;
-    private boolean debug = false, isThisObjRef = false;
+    private boolean debug = false, isThisObjRef = false, arrayLRef = false;
     private final SourcePosition pos = new SourcePosition();
 
     public Checker() 
@@ -165,7 +165,7 @@ public class Checker implements Visitor<Object,Type>
 
         type1 = stmt.varDecl.visit(this, null);
         if ((type2 != null) && (!checkTypes(type1, type2)))
-            reporter.reportError("aIncompatible types - found "+ type2.toString()+
+            reporter.reportError("Incompatible types - found "+ type2.toString()+
                                  " but expected "+ type1.toString(), "", stmt.posn);
 
         return (declType);
@@ -175,12 +175,20 @@ public class Checker implements Visitor<Object,Type>
     {
         boolean cond = false;
         Type type1 = null, type2 = null;
-
+        
+        arrayLRef = false;
         isThisObjRef = false;
         type1 = stmt.ref.visit(this, null);
         if (isThisObjRef) {
             cond = true;
             reporter.reportError("Illegal start of type", "", stmt.posn);
+        }
+
+        if (arrayLRef) {
+            reporter.reportError("Cannot assign value to array length field",
+                                    "", stmt.posn);
+            arrayLRef = false;
+            return (voidType);
         }
 
         isThisObjRef = false;
@@ -423,6 +431,11 @@ public class Checker implements Visitor<Object,Type>
             case ("=="):
                 if (checkTypes(type1, type2)) {
                     return booleanType;
+                } else if (generateErrorMsg(type1, type2) != null){
+                    reporter.reportError("Operator ' "+opName+" ' cannot be applied to " +
+                            generateErrorMsg(type1, type2) +
+                            " types", "", op.posn);
+                    return errorType;
                 } 
                 break;
             default:
@@ -435,6 +448,49 @@ public class Checker implements Visitor<Object,Type>
         return errorType;
     }
 
+    public String generateErrorMsg (Type type1, Type type2)
+    {
+        if ((type1.typeKind != TypeKind.ARRAY) &&
+            (type2.typeKind != TypeKind.ARRAY)) {
+            if ((type1.typeKind != TypeKind.CLASS) &&
+                (type2.typeKind != TypeKind.CLASS)) {
+                if ((type1.typeKind != TypeKind.UNSUPPORTED) &&
+                    (type2.typeKind != TypeKind.UNSUPPORTED)) {
+                    if ((checkTypes(type1, type2, TypeKind.INT)) ||
+                        (checkTypes(type1, type2, TypeKind.BOOLEAN)) ||
+                        (checkTypes(type1, type2, TypeKind.VOID))) {
+                        return (null);
+                    }
+                } else if ((type1.typeKind == TypeKind.UNSUPPORTED) &&
+                           (type2.typeKind == TypeKind.UNSUPPORTED)) {
+                            return ("Class "+ ((ClassType)type1).className +
+                                    ", Class "+ ((ClassType)type2).className);
+                }
+            } else if ((type1.typeKind == TypeKind.CLASS) &&
+                       (type2.typeKind == TypeKind.CLASS)) {
+                    return ("Class "+ ((ClassType)type1).className + 
+                            ", Class "+ ((ClassType)type2).className);
+            }
+        } else if ((type1.typeKind == TypeKind.ARRAY) &&
+                   (type2.typeKind == TypeKind.ARRAY)) {
+                Type typea = type1.visit(this, null);
+                Type typeb = type2.visit(this, null);
+
+                if ((typea.typeKind == TypeKind.CLASS) &&
+                    (typeb.typeKind == TypeKind.CLASS)) {
+                    return ("Array of Class "+ ((ClassType)typea).className +
+                            ", Array of Class "+ ((ClassType)typeb).className);
+                } else if ((typea.typeKind == TypeKind.UNSUPPORTED) &&
+                           (typeb.typeKind == TypeKind.UNSUPPORTED)) {
+                    return ("Array of Class "+ ((ClassType)typea).className +
+                            ", Array of Class "+ ((ClassType)typeb).className);
+                } else if ((typea.typeKind != TypeKind.CLASS) &&
+                           (typeb.typeKind != TypeKind.CLASS)) {
+                    return ("Arrays of different types");
+                }
+        }
+        return (null);
+    }
     public Type visitUnaryOperator (Operator op, Type type1)
     {
         String opName = op.spelling;
@@ -584,6 +640,13 @@ public class Checker implements Visitor<Object,Type>
             type = ((MethodDecl) ref.decl).type;
         }
         return (type);
+    }
+
+    public Type visitArrayLengthRef(ArrayLengthRef ref, Object arg)
+    {
+        ref.ref.visit(this, null); 
+        arrayLRef = true;
+        return (new BaseType (TypeKind.INT, pos));
     }
 
     public boolean checkArgList (MethodDecl decl, ExprList argList, SourcePosition posn)

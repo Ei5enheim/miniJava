@@ -357,7 +357,8 @@ public class Identification implements Visitor<String,Object> {
         Identifier id = null;
         String name = null, className = null;
         boolean isMethodCall = false, isStatic = false, isPrivate = false;
-        boolean isLocalVar = false, shouldBStatic = true;
+        boolean isLocalVar = false, shouldBStatic = false, skipLookup = false;
+        boolean accessThStatic = false, isSystemClass = false;
         IdentifierList ql = qr.qualifierList;
     
         if ((isMCall != null) && isMCall.equals("true"))
@@ -411,6 +412,13 @@ public class Identification implements Visitor<String,Object> {
                                              " ", id.posn);
                         return (qr);
                     } 
+                    // ensuring that it is access through static vars
+                    // need to remove this check after PA4
+                    if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
+                        accessThStatic = true;
+                        reporter.reportError("Reference involving static variables is"+
+                                             " is not allowed", id.spelling, id.posn);
+                    }
                     ref = new MemberRef((MemberDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
                 } else if (((level == SymbolTable.CLASSLEVEL) || 
@@ -419,6 +427,8 @@ public class Identification implements Visitor<String,Object> {
                     ref = new ClassRef((ClassDecl) decl, qr.posn);
                     classDecl = decl;
                     shouldBStatic = true;
+                    if (name.equals("System"))
+                        isSystemClass = true;
                 } else {
                     reporter.reportError("cannot find symbol - variable ", id.spelling, id.posn);
                     return (qr);
@@ -427,6 +437,12 @@ public class Identification implements Visitor<String,Object> {
                 if ((decl = table.retrieveMemberDecl(name)) == null) {
                     reporter.reportError("cannot find symbol -", id.spelling, id.posn);
                     return (qr);
+                }
+                // need to remove this check after PA4
+                if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
+                    accessThStatic = true;
+                    reporter.reportError("Reference involving static variables is"+
+                                         " is not allowed", id.spelling, id.posn);
                 }
                 ((ThisRef)ref).setMemberDecl((MemberDecl)decl);
                 classDecl = retrieveClassDecl(decl);
@@ -443,48 +459,86 @@ public class Identification implements Visitor<String,Object> {
             name = id.spelling;
             className = classDecl.name;
             // Method name is passed as an argument
-            if (isMethodCall && (i  == (ql.size() - 1))) {
-                decl = retrieveMethodDeclaration(classDecl, name);
-                if (debug)
-                    System.out.println("Found method declaration for "+name);
-            } else {
+            if (i  == (ql.size() - 1)) {
+                if (isMethodCall) {
+                    decl = retrieveMethodDeclaration(classDecl, name);
+                    if (debug)
+                        System.out.println("Found method declaration for "+name);
+                // below check ensures that Class.length is skipped because of the array type check
+                } else if (!shouldBStatic &&
+                            (name.equals("length")) && 
+                            isArrayType(decl)) {
+                    skipLookup = true;
+                    if (debug)
+                        System.out.println("insdide skipcode "+name);
+                } else {
+                    decl = retrieveFieldDeclaration(classDecl, name);
+                    if (debug)
+                        System.out.println("Found field declaration for "+name);
+                }
+            } else { 
                 decl = retrieveFieldDeclaration(classDecl, name);
                 if (debug)
                     System.out.println("Found field declaration for "+name);
-            }
+            } 
+            if (!skipLookup) {
+                if (decl != null) {
+                    isStatic = ((MemberDecl) decl).isStatic;
+                    isPrivate = ((MemberDecl) decl).isPrivate;
 
-            if (decl != null) {
-                isStatic = ((MemberDecl) decl).isStatic;
-                isPrivate = ((MemberDecl) decl).isPrivate;
-
-                if (isPrivate && !className.equals(currentClass)) {
-                    reporter.reportError(id.spelling + " has private access in ", className, id.posn);
+                    if (isPrivate && !className.equals(currentClass)) {
+                        reporter.reportError(id.spelling + " has private access in ",
+                                             className, id.posn);
+                        return (qr);
+                    }
+                    if ((shouldBStatic) && (i == 1) && !isStatic) {
+                        reporter.reportError("non static variable ' " + id.spelling +
+                                "' :cannot be referenced from a static context ",
+                                " ", id.posn);
+                        return (qr);
+                    } else if ((shouldBStatic) && (i == 1)) {
+                        ((ClassRef)ref).decl = (MemberDecl)decl;
+                        shouldBStatic = false;
+                    } else { 
+                        ref = new DeRef(ref, (MemberDecl)decl, id.posn);
+                    }
+                    classDecl = retrieveClassDecl(decl);
+                    // need to remove this check after PA4
+                    if (isStatic && (i  != (ql.size() - 1)) &&
+                        !accessThStatic && (!name.equals("out")) &&
+                        !isSystemClass) {
+                        accessThStatic = true;
+                        reporter.reportError("Reference involving static variables is"+
+                                             " is not allowed", id.spelling, id.posn);
+                    } 
+                } else {
+                    reporter.reportError("cannot find symbol - variable- " +
+                                         id.spelling +" in class: " + className,
+                                         "", id.posn);
                     return (qr);
-                }
-                if ((shouldBStatic) && (i == 1) && !isStatic) {
-                    reporter.reportError("non static variable ' " + id.spelling +
-                            "' :cannot be referenced from a static context ",
-                            " ", id.posn);
-                    return (qr);
-                } else if ((shouldBStatic) && (i == 1)) {
-                   ((ClassRef)ref).decl = (MemberDecl)decl;
-                } else { 
-                    ref = new DeRef(ref, (MemberDecl)decl, id.posn);
-                }
-                classDecl = retrieveClassDecl(decl);
+                }    
             } else {
-                reporter.reportError("cannot find symbol - variable- " + id.spelling +
-                                     " in class: " + className, "", id.posn);
-                return (qr);
-            }    
+                ref = new ArrayLengthRef(ref, id.posn);
+            }
         }
-
-	//  check to prevent static access and referencing class, ignoring if "this" is being referenced
-        if (!isLocalVar && !(qr.thisRelative && (ql.size() < 1)) && ((MemberDecl) decl).isStatic) {
+	/**  check to prevent static access and referencing class, 
+          * ignoring if "this" is being referenced or array length is referenced
+          */
+        if (!skipLookup && !isLocalVar && 
+            !(qr.thisRelative && (ql.size() < 1)) && 
+            ((MemberDecl) decl).isStatic) {
             reporter.reportError("PA3 no static access error", id.spelling, id.posn);
             // report error "PA3 no static access error"
         }
         return ref;
+    }
+
+    public boolean isArrayType(Declaration decl) 
+    {
+        if (decl.type.typeKind == TypeKind.ARRAY) 
+            return (true);       
+
+        return (false);
     }
 
     public ClassDecl retrieveClassDecl (Declaration decl)
@@ -518,7 +572,12 @@ public class Identification implements Visitor<String,Object> {
         }
         return null;
     }
-    
+
+    public Object  visitArrayLengthRef(ArrayLengthRef ref, String arg)
+    {
+        return null;
+    }    
+
     public Object visitIndexedRef(IndexedRef ir, String arg) {
     	//show(arg, ir);
         ir.ref = (Reference) ir.ref.visit(this, null);

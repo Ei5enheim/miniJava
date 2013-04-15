@@ -20,6 +20,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     private boolean debug = false, secondWalk = false;
     private boolean isMethodCall = false;
     int labelMain = 0, patchMainCall = 0;
+    
     int ST = 0;
 
     public CodeGenerator() 
@@ -37,6 +38,30 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         Machine.emit(Op.LOADL, -1);
         Machine.emit(Op.CALL, Reg.CB, labelMain);
         Machine.emit(Op.HALT, 0, 0, 0);
+
+        String objectCodeFileName = "testfile.mJAM";
+        ObjectFile objF = new ObjectFile(objectCodeFileName);
+        System.out.println("Generating the code file " + objectCodeFileName + " ..:)");
+        if (objF.write()) {
+            System.out.println("FAILED to generate the code file!");
+            return;
+        } else {
+            System.out.println("SUCCEEDED in generating the code file!");
+        }
+        
+        // create the asm file
+        System.out.println("writing assembly file ..");
+
+        Disassembler d = new Disassembler(objectCodeFileName);
+        if (d.disassemble()) {
+            System.out.println("FAILED to generate the assembly file!");
+            return;
+        } else {
+            System.out.println("SUCCEEDED in generating the assembly file!");
+        }
+        System.out.println("Running code ..");
+        Interpreter.interpret(objectCodeFileName);
+        System.out.println("Finished execution");
     }   
     
     // Package
@@ -583,6 +608,16 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         isLHS = isLHSLocalFlag;
         return (Integer.valueOf(1));
     }
+
+    public Integer visitArrayLengthRef(ArrayLengthRef ref, Integer arg)
+    {
+        int pushCount = ref.ref.visit(this, arg);
+        Machine.emit(Op.LOADL, -1);
+        Machine.emit(Prim.add);
+        Machine.emit(Op.LOADI);
+        return (Integer.valueOf(1));
+    }
+
 
     public Integer pushArgList (ExprList argList, Integer arg)
     {

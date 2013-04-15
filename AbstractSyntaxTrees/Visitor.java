@@ -53,7 +53,7 @@ public interface Visitor<ArgType,ResultType> {
     public ResultType visitClassRef(ClassRef ref, ArgType arg);
     public ResultType visitThisRef(ThisRef ref, ArgType arg);
     public ResultType visitDeRef(DeRef ref, ArgType arg);
-    
+    public ResultType visitArrayLengthRef(ArrayLengthRef ref, ArgType arg);
   // Terminals
     public ResultType visitIdentifier(Identifier id, ArgType arg);
     public ResultType visitOperator(Operator op, ArgType arg);

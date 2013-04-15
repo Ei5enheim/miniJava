@@ -13,6 +13,9 @@ public class ClassDecl extends Declaration {
 	  super(cn, null, posn);
 	  fieldDeclList = fdl;
 	  methodDeclList = mdl;
+	  noOfFields = 0;
+	  noOfStaticFields = 0;
+	  containsMain = false;
   }
   
   public <A,R> R visit(Visitor<A, R> v, A o) {
@@ -21,4 +24,7 @@ public class ClassDecl extends Declaration {
       
   public FieldDeclList fieldDeclList;
   public MethodDeclList methodDeclList;
+  public int noOfFields;
+  public int noOfStaticFields;
+  public boolean containsMain;
 }

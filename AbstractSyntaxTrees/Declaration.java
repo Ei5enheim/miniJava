@@ -6,6 +6,7 @@
 package miniJava.AbstractSyntaxTrees;
 
 import miniJava.SyntacticAnalyzer.SourcePosition;
+import miniJava.CodeGenerator.FieldAddress;
 
 public abstract class Declaration extends AST {
 	
@@ -17,4 +18,5 @@ public abstract class Declaration extends AST {
 	
 	public String name;
 	public Type type;
+	public FieldAddress storage;
 }

@@ -15,10 +15,12 @@ public class Identification implements Visitor<String,Object> {
 	
     private boolean secondWalk = false, debug = false;
     private SymbolTable table;
-    private boolean isStaticMethod = false, mainMethodFound = false, userDefinedStringClass = false;
+    private boolean isStaticMethod = false, mainMethodFound = false;
+    private boolean userDefinedStringClass = false;
     private String currentClass = null;
     private ErrorReporter reporter;
     private VarDecl lVariable = null;
+    boolean mainClassfound = false;
     
     public Identification() 
     {
@@ -66,9 +68,12 @@ public class Identification implements Visitor<String,Object> {
     }
     
   // Declarations
-    public Object visitClassDecl(ClassDecl clas, String arg){
-       
-        // need to add the exit(4) code in the symbol table
+    public Object visitClassDecl(ClassDecl clas, String arg)
+    {
+        int fieldOffset = 0;
+        int staticFieldOffset = 2;
+        int methodOffset = 1;
+
         if (debug)
             System.out.println(" In class decl " + clas.name);
         if (!secondWalk) {
@@ -82,9 +87,20 @@ public class Identification implements Visitor<String,Object> {
             // parent scope is being set for the case where we have a block inside in the class
             table.newScope(true); 
             
-            for (FieldDecl f: clas.fieldDeclList)
+            for (FieldDecl f: clas.fieldDeclList) 
+            {
+                if (f.isStatic) {
+                    clas.noOfStaticFields++;
+                } else { 
+                    clas.noOfFields++;
+                    f.storage.offset = fieldOffset;
+                    fieldOffset++;
+                }
                 f.visit(this, null);
-    
+            }
+
+            methodOffset = 1 + 1 + clas.noOfStaticFields + 1;
+
             for (MethodDecl m: clas.methodDeclList) {
                 if ((table.retrieveMemberDecl(m.name) != null) ||
                     (table.retrieveMemberDecl(m.name+"function") != null)) {
@@ -92,7 +108,14 @@ public class Identification implements Visitor<String,Object> {
                 }  else if (table.add(m.name+"function", m)) {
                     reporter.reportError("Method" +m.name+" is already defined in the class", "", m.posn);
                 }
+                m.storage.offset = methodOffset++; 
             }
+
+            if (mainMethodFound && !mainClassfound) {
+                clas.containsMain = true;
+                mainClassfound =  true;
+            }
+
             currentClass = clas.name;
             for (MethodDecl m: clas.methodDeclList) {
                 isStaticMethod = false;
@@ -102,38 +125,6 @@ public class Identification implements Visitor<String,Object> {
         }
         return null;
     }
-    /**
-    boolean isBasetype (Type t)
-    {
-        if ((t.typeKind == TypeKind.VOID) ||
-            (t.typeKind == TypeKind.INT) ||
-            (t.typeKind == TypeKind.BOOLEAN)) {
-            return (true);
-        }
-        return (false);
-    } 
-
-    boolean isValidClasstype (Type t)
-    {
-        if (t.typeKind == TypeKind.CLASS) {
-            if ((retrieveClassDecl(t.className) != null)
-                return (true);
-        }
-        return (false);
-    }
-
-    boolean isValidArraytype (Type t)
-    {
-        if (t.typeKind == TypeKind.ARRAY) {
-            if (isBasetype(t.eltType) {
-                return (true);
-            } else if (isValidClasstype(t.eltType)) {
-                return (true);
-            }
-        }
-        return (false);
-    }
-    */
     
     public Object visitFieldDecl(FieldDecl f, String arg)
     {
@@ -173,8 +164,9 @@ public class Identification implements Visitor<String,Object> {
             return;
         } else if (!(((ClassType)((ArrayType) pd.type).eltType).className.equals("String"))) {
             return;
-        } else if (userDefinedStringClass) {
-            return;
+        } else if (userDefinedStringClass && !mainMethodFound) {
+                reporter.reportError("public static void main (String[] args) method found, but" +
+                                     "parameter is not of default String type", "", m.posn);
         }
 	
         if (mainMethodFound) {
@@ -198,8 +190,11 @@ public class Identification implements Visitor<String,Object> {
         m.type.visit(this,null); 
         
         ParameterDeclList pdl = m.parameterDeclList;
+	//int length = pdl.size();
         for (ParameterDecl pd: pdl) {
             pd.visit(this, null);
+	    //pd.storage.offset = -length;
+	    //length--;
         }   
 
         StatementList sl = m.statementList;
@@ -362,7 +357,7 @@ public class Identification implements Visitor<String,Object> {
         Identifier id = null;
         String name = null, className = null;
         boolean isMethodCall = false, isStatic = false, isPrivate = false;
-        boolean isLocalVar = false;
+        boolean isLocalVar = false, shouldBStatic = true;
         IdentifierList ql = qr.qualifierList;
     
         if ((isMCall != null) && isMCall.equals("true"))
@@ -423,6 +418,7 @@ public class Identification implements Visitor<String,Object> {
                            (ql.size() != 1)) {
                     ref = new ClassRef((ClassDecl) decl, qr.posn);
                     classDecl = decl;
+                    shouldBStatic = true;
                 } else {
                     reporter.reportError("cannot find symbol - variable ", id.spelling, id.posn);
                     return (qr);
@@ -465,15 +461,16 @@ public class Identification implements Visitor<String,Object> {
                     reporter.reportError(id.spelling + " has private access in ", className, id.posn);
                     return (qr);
                 }
-                if (((level == SymbolTable.CLASSLEVEL) ||
-                     (level == SymbolTable.PREDEFINEDLEVEL)) && 
-                    (i == 1) && !isStatic) {
+                if ((shouldBStatic) && (i == 1) && !isStatic) {
                     reporter.reportError("non static variable ' " + id.spelling +
                             "' :cannot be referenced from a static context ",
                             " ", id.posn);
                     return (qr);
-                } 
-                ref = new DeRef(ref, (MemberDecl)decl, id.posn);
+                } else if ((shouldBStatic) && (i == 1)) {
+                   ((ClassRef)ref).decl = (MemberDecl)decl;
+                } else { 
+                    ref = new DeRef(ref, (MemberDecl)decl, id.posn);
+                }
                 classDecl = retrieveClassDecl(decl);
             } else {
                 reporter.reportError("cannot find symbol - variable- " + id.spelling +

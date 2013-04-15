@@ -99,10 +99,13 @@ public class Checker implements Visitor<Object,Type>
                     reporter.reportError("Incompatible types - found " +type.toString()+
                                         " but expected " + m.type.toString(), "", m.posn);
             }
+            m.storage.size = 1;
         } else {
             if (m.type.typeKind != TypeKind.VOID) {
                 reporter.reportError("return statement missing in method ", m.name, m.posn);
             }
+            // setting the size of return value.
+            m.storage.size = 0;
         }
         return (m.type);
     }
@@ -520,10 +523,23 @@ public class Checker implements Visitor<Object,Type>
 
     public Type visitClassRef(ClassRef ref, Object arg)
     {
+        Type type = null;
+
         if (debug)
             System.out.println("In class reference");
 
-        return (new ClassType(ref.decl.name, pos));
+        if (arg == null) {
+            type = ref.decl.type;
+            if (isUnsupportedType(type)) {
+                reporter.reportError("reference to symbol '" + ref.decl.name +
+                "' of unsupported type", "", ref.posn);
+                return (errorType);
+            }
+        } else {
+            checkArgList((MethodDecl)ref.decl, (ExprList)arg, ref.posn);
+            type = ((MethodDecl) ref.decl).type;
+        }
+        return (type);
     }
 
     public Type visitThisRef(ThisRef ref, Object arg)

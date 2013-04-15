@@ -15,18 +15,26 @@ public class ClassRef extends Reference
     public ClassRef(ClassDecl decl, SourcePosition posn)
     {
         super (posn);
-        this.decl = decl;
+        this.cdecl = decl;
+	this.decl = null;
     }
 
     public ClassRef(SourcePosition posn)
     {
         super (posn);
-        this.decl = null;
+        this.cdecl = null;
+	this.decl = null;
     }
     
-    public void setDecl(ClassDecl decl) 
+    public void setCDecl(ClassDecl decl) 
     {
-        this.decl = decl;
+        this.cdecl = decl;
+    }
+
+    public void setDecl(MemberDecl decl)
+    {
+
+	this.decl = decl;
     }
 
     public <A,R> R visit(Visitor<A,R> v, A o)
@@ -34,5 +42,7 @@ public class ClassRef extends Reference
         return (v.visitClassRef(this, o));
     }
     
-    public ClassDecl decl;
+    public MemberDecl decl;
+    public ClassDecl cdecl;
+    
 }

@@ -99,8 +99,6 @@ public class Identification implements Visitor<String,Object> {
                 f.visit(this, null);
             }
 
-            methodOffset = 1 + 1 + clas.noOfStaticFields + 1;
-
             for (MethodDecl m: clas.methodDeclList) {
                 if ((table.retrieveMemberDecl(m.name) != null) ||
                     (table.retrieveMemberDecl(m.name+"function") != null)) {
@@ -111,16 +109,17 @@ public class Identification implements Visitor<String,Object> {
                 m.storage.offset = methodOffset++; 
             }
 
-            if (mainMethodFound && !mainClassfound) {
-                clas.containsMain = true;
-                mainClassfound =  true;
-            }
-
             currentClass = clas.name;
             for (MethodDecl m: clas.methodDeclList) {
                 isStaticMethod = false;
         	m.visit(this, null);
             }
+
+            if (mainMethodFound && !mainClassfound) {
+                clas.containsMain = true;
+                mainClassfound =  true;
+            }
+
             table.closeScope(true);
         }
         return null;
@@ -358,6 +357,7 @@ public class Identification implements Visitor<String,Object> {
         String name = null, className = null;
         boolean isMethodCall = false, isStatic = false, isPrivate = false;
         boolean isLocalVar = false, shouldBStatic = false, skipLookup = false;
+        boolean isLengthRef = false;
         boolean accessThStatic = false, isSystemClass = false;
         IdentifierList ql = qr.qualifierList;
     
@@ -427,6 +427,7 @@ public class Identification implements Visitor<String,Object> {
                     ref = new ClassRef((ClassDecl) decl, qr.posn);
                     classDecl = decl;
                     shouldBStatic = true;
+                    // need to remove after pa4
                     if (name.equals("System"))
                         isSystemClass = true;
                 } else {
@@ -452,12 +453,18 @@ public class Identification implements Visitor<String,Object> {
         for (int i = 1; i < ql.size(); i++) {
             isLocalVar = false;
             id = ql.get(i);
-            if (classDecl == null) {
+            name = id.spelling;
+            if ((i  == (ql.size() - 1)) && 
+                    isArrayType(decl)  && (name.equals("length"))) {
+                isLengthRef = true;
+            }
+            // need this check for length field
+            if ((classDecl == null) && !isLengthRef) { 
                 reporter.reportError("unable to derefence variable-", id.spelling, id.posn);
                 return (qr);
             }
-            name = id.spelling;
-            className = classDecl.name;
+            if (!isLengthRef)
+                className = classDecl.name;
             // Method name is passed as an argument
             if (i  == (ql.size() - 1)) {
                 if (isMethodCall) {

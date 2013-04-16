@@ -17,9 +17,9 @@ import mJAM.Machine.Prim;
 
 public class CodeGenerator implements Visitor<Integer, Integer>
 {
-    private boolean debug = false, secondWalk = false;
-    private boolean isMethodCall = false;
-    int labelMain = 0, patchMainCall = 0;
+    private boolean debug = true, secondWalk = false;
+    private boolean isMethodCall = false, isPrintCall = false;
+    int labelMain = 0, patchMe = 0;
     
     int ST = 0;
 
@@ -30,11 +30,13 @@ public class CodeGenerator implements Visitor<Integer, Integer>
 
     public void generateCode (AST ast)
     {
-        ast.visit(this, null);
+        ast.visit(this, Integer.valueOf(0));
         secondWalk = true;
-        patchMainCall = Machine.nextInstrAddr();
-        ast.visit(this, null);
-        Machine.patch(patchMainCall, Machine.nextInstrAddr());
+        //no need of this 
+        //patchMainCall = Machine.nextInstrAddr();
+        //Machine.emit(Op.JUMP, Reg.CB, 0);
+        ast.visit(this, Integer.valueOf(0));
+        //Machine.patch(patchMainCall, Machine.nextInstrAddr());
         Machine.emit(Op.LOADL, -1);
         Machine.emit(Op.CALL, Reg.CB, labelMain);
         Machine.emit(Op.HALT, 0, 0, 0);
@@ -79,48 +81,53 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     // Declarations
     public Integer visitClassDecl(ClassDecl clas, Integer arg)
     {
-        // storing the start of class object
-        clas.storage.offset = ST;
         int methodOffset = 0, methodLabel = 0;
-        /* 
-         * format of class object
-         *      super class
-         *      no of static fields
-         *      static fields
-         *      no of methods
-         *      method pointers
-         */
-        Machine.emit(Op.LOADL, -1);
-        Machine.emit(Op.LOADL, clas.noOfStaticFields);
-        Machine.emit(Op.PUSH, clas.noOfStaticFields);
-    
-        ST += 2;        
         if (!secondWalk) {
+            /* 
+             * format of class object
+             *      static fields
+             *      super class
+             *      no of methods
+             *      method pointers
+             */
             for (FieldDecl f: clas.fieldDeclList) {
                 if (f.isStatic) {
                     f.storage.offset = ST;
+                    Machine.emit(Op.LOADL,0);
+                    Machine.emit(Op.STORE, Reg.SB, ST);
                     ST++;        
                 }
             }
-            methodOffset = 2 + clas.noOfStaticFields;            
+            // storing the offset of the classobject
+            clas.storage.offset = ST;
+            Machine.emit(Op.LOADL, -1);
+            // superclass, no of methods
             Machine.emit(Op.LOADL, clas.methodDeclList.size());
-            Machine.emit(Op.PUSH, clas.methodDeclList.size());
+            if (clas.methodDeclList.size() > 0)
+                Machine.emit(Op.PUSH, clas.methodDeclList.size());
+            ST += 2;
+            System.out.println("**classOffset: " + clas.storage.offset);
             for (MethodDecl m: clas.methodDeclList) {
                 m.storage.offset = methodOffset;
+                System.out.println("**methodOffset: " + methodOffset);
                 ST++;
                 methodOffset++;
             }
         } else {
             for (MethodDecl m: clas.methodDeclList) {
                 methodLabel = Machine.nextInstrAddr(); 
-                Machine.emit(Op.LOADL, methodLabel + 2);
-                Machine.emit(Op.STORE, Reg.SB, clas.storage.offset + 
-                                               m.storage.offset);  
+                Machine.emit(Op.LOADL, methodLabel + 3);
+                Machine.emit(Op.STORE, Reg.SB, clas.storage.offset + 2 + 
+                             m.storage.offset);
                 if (clas.containsMain && m.name.equals("main")) {
-                    labelMain = Machine.nextInstrAddr();
-                    m.visit(this, Integer.valueOf(0));
+                    // label of main method
+                    labelMain = Machine.nextInstrAddr() + 1;
                 }
-            }
+                patchMe = Machine.nextInstrAddr();
+                Machine.emit(Op.JUMP, Reg.CB, 0);
+                m.visit(this, Integer.valueOf(0));
+                Machine.patch(patchMe, Machine.nextInstrAddr()); 
+            }   
         }
         return (Integer.valueOf(0));
     } 
@@ -224,6 +231,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         } else if (op == MEMREF) {
             Machine.emit(Prim.fieldupd);
         } else if (op == LOCALREF) {
+            if (debug)
+                System.out.println("In visitAssignStmt, LOCALREF case");
             Machine.emit(Op.STORE, Reg.LB, offset);
         } else {
             // static ref case
@@ -236,8 +245,13 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     {
         if (debug)
             System.out.println("In call stmt");
-        stmt.methodRef.visit(this, arg); 
+
+        int pushCount = pushArgList(stmt.argList, arg).intValue();
+        isMethodCall = true;
         //ignoring the return value from a call statement
+        stmt.methodRef.visit(this, Integer.valueOf(
+                             arg.intValue() + pushCount)).intValue();
+        isMethodCall = false;
         return (Integer.valueOf(0));
     }
     
@@ -245,21 +259,26 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     {
         stmt.cond.visit(this, arg).intValue();
         int patchIf = Machine.nextInstrAddr(); 
-    
+        int skipElse = 0;
+ 
         Machine.emit(Op.JUMPIF, 0, Reg.CB, 0);
 
         stmt.thenStmt.visit(this, arg).intValue();
-        int skipElse = Machine.nextInstrAddr(); 
-        Machine.emit(Op.JUMP, Reg.CB, 0);
+        // int skipElse = Machine.nextInstrAddr(); 
+        // Machine.emit(Op.JUMP, Reg.CB, 0);
 
         if (stmt.elseStmt != null) 
         {
+            skipElse = Machine.nextInstrAddr();
+            Machine.emit(Op.JUMP, Reg.CB, 0);
             int elsePC = Machine.nextInstrAddr();
-            Machine.patch(patchIf, elsePC);           
+            Machine.patch(patchIf, elsePC);
             stmt.elseStmt.visit(this, arg);
+            Machine.patch(skipElse, Machine.nextInstrAddr());
+        } else {
+            int endInstr = Machine.nextInstrAddr();
+            Machine.patch(patchIf, endInstr);
         }
-        int endInstr = Machine.nextInstrAddr();
-        Machine.patch(skipElse, endInstr);
         return (Integer.valueOf(0));
     }
     
@@ -490,6 +509,9 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     
     public Integer visitIntLiteral(IntLiteral num, Integer arg)
     {
+        if (debug)
+            System.out.println("In visitIntLiteral");
+
         Machine.emit(Op.LOADL, Integer.valueOf(num.spelling).intValue());
         return (Integer.valueOf(1));
     }
@@ -542,15 +564,23 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             System.out.println("In class reference");
 
         if (isMethodCall) {
+            System.out.println("**In class reference");
             Machine.emit(Op.LOAD, -1);
             Machine.emit(Op.LOAD, ref.cdecl.storage.offset + 
                                   ref.decl.storage.offset);
             Machine.emit(Op.CALLI);
             return (Integer.valueOf(ref.decl.storage.size));
         }
+
         if (isLHS) {
             OP = STATICREF;
             return (Integer.valueOf(ref.decl.storage.offset));
+        }
+        // need to remove this check once static fields are implemented
+        if (ref.cdecl.name.equals("System") && ref.decl.name.equals("out")) {
+            System.out.println("***In class reference");
+            isPrintCall = true;
+            return (Integer.valueOf(0));    
         }
         Machine.emit(Op.LOAD, Reg.SB, ref.decl.storage.offset);
         return (Integer.valueOf(ref.decl.storage.size));
@@ -559,6 +589,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
 
     public Integer visitThisRef(ThisRef ref, Integer arg)
     {
+        if (debug)
+            System.out.println("In this reference"); 
         if (isMethodCall) {
             Machine.emit(Op.LOADA, Reg.OB, 0);
             Machine.emit(Op.CALLD, ref.decl.storage.offset);
@@ -575,25 +607,35 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         } else {
             Machine.emit(Op.LOADA, Reg.OB, 0);
         }
-        return (Integer.valueOf(ref.decl.storage.size));
+        if (ref.decl != null)
+            return (Integer.valueOf(ref.decl.storage.size));
+        else 
+            return (Integer.valueOf(1));
     }
 
     public Integer visitDeRef(DeRef ref, Integer arg)
     {
+
+        if (debug)
+            System.out.println("In Dereference" + isMethodCall);
+
         boolean isMethodCallLocalFlag = isMethodCall;
         boolean isLHSLocalFlag = isLHS;
         // resetting so that further calls do not misinterrupt the meaning of it.
         isMethodCall = false;
         isLHS = false;
 
-        if (debug)
-            System.out.println("In Dereference");
-
         // need to revisit this part after completing recursion code.
         ref.ref.visit(this, arg);
+        System.out.println("2In Dereference, isMethodCallLocalFlag"+ isMethodCallLocalFlag);
         
         if (isMethodCallLocalFlag) {
-            Machine.emit(Op.CALLD, ref.decl.storage.offset);
+            if (isPrintCall && ref.decl.name.equals("println")) {
+                System.out.println("**In Dereference");
+                Machine.emit(Prim.putint);
+            } else {
+                Machine.emit(Op.CALLD, ref.decl.storage.offset);
+            }
             return (Integer.valueOf(ref.decl.storage.size));
         }
 

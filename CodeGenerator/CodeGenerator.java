@@ -32,11 +32,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     {
         ast.visit(this, Integer.valueOf(0));
         secondWalk = true;
-        //no need of this 
-        //patchMainCall = Machine.nextInstrAddr();
-        //Machine.emit(Op.JUMP, Reg.CB, 0);
         ast.visit(this, Integer.valueOf(0));
-        //Machine.patch(patchMainCall, Machine.nextInstrAddr());
         Machine.emit(Op.LOADL, -1);
         Machine.emit(Op.CALL, Reg.CB, labelMain);
         Machine.emit(Op.HALT, 0, 0, 0);
@@ -75,7 +71,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         for (ClassDecl c: prog.classDeclList) {
             c.visit(this, null);
         }
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     // Declarations
@@ -129,12 +125,12 @@ public class CodeGenerator implements Visitor<Integer, Integer>
                 Machine.patch(patchMe, Machine.nextInstrAddr()); 
             }   
         }
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     } 
 
     public Integer visitFieldDecl(FieldDecl f, Integer arg)
     {
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
 
     public Integer visitMethodDecl(MethodDecl m, Integer arg)
@@ -164,12 +160,12 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         //when returning subtract 3 offset and pop those many elements from the stack
             Machine.emit(Op.RETURN, 0, 0, m.parameterDeclList.size());
         }
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     public Integer visitParameterDecl(ParameterDecl pd, Integer arg) 
     {
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     } 
     
     public Integer visitVarDecl(VarDecl vd, Integer arg)
@@ -193,7 +189,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         for (Statement s: sl) {
              offset += s.visit(this, Integer.valueOf(offset));
         }
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     public Integer visitVardeclStmt (VarDeclStmt stmt, Integer arg)
@@ -238,7 +234,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             // static ref case
             Machine.emit(Op.STORE, Reg.SB, offset);
         }
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     public Integer visitCallStmt(CallStmt stmt, Integer arg)
@@ -252,7 +248,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         stmt.methodRef.visit(this, Integer.valueOf(
                              arg.intValue() + pushCount)).intValue();
         isMethodCall = false;
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     public Integer visitIfStmt(IfStmt stmt, Integer arg)
@@ -279,7 +275,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             int endInstr = Machine.nextInstrAddr();
             Machine.patch(patchIf, endInstr);
         }
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     public Integer visitWhileStmt(WhileStmt stmt, Integer arg)
@@ -294,7 +290,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         stmt.cond.visit(this, arg);
         Machine.emit(Op.JUMPIF, 1, Reg.CB, body); 
         
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     
@@ -361,24 +357,24 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         Machine.emit(Op.LOADA, Reg.SB, expr.classtype.classDecl.storage.offset);
         Machine.emit(Op.LOADL, expr.classtype.classDecl.noOfFields);
         Machine.emit(Prim.newobj);
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(ADDRESSSIZE));
     }
 
     //Types
     public Integer visitBaseType(BaseType type, Integer arg)
     {
         // can return size based on the type by placing checks
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(BASETSIZE));
     }
 
     public Integer visitClassType(ClassType type, Integer arg)
     {
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(ADDRESSSIZE));
     }
 
     public Integer visitArrayType(ArrayType type, Integer arg)
     {
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(ADDRESSSIZE));
     }    
    
     // References
@@ -387,7 +383,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     {
         if (debug)
             System.out.println("In qualified reference");
-        return (null);
+        return (Integer.valueOf(VOIDRSIZE));
     }
 
     public  Integer visitIndexedRef(IndexedRef ir, Integer arg)
@@ -423,7 +419,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         } 
 
         Machine.emit(Prim.arrayref);
-        return(Integer.valueOf(1));
+        return(Integer.valueOf(ADDRESSSIZE));
     }
     
   // Terminals
@@ -432,15 +428,15 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         if (debug)
             System.out.println("In visitIdentifier method");
 
-        return (Integer.valueOf(0));
+        return (Integer.valueOf(VOIDRSIZE));
     }
     
     public Integer visitOperator(Operator op, Integer arg)
     {
-       return (Integer.valueOf(0)); 
+       return (Integer.valueOf(VOIDRSIZE)); 
     }
 
-    public Type visitBinaryOperator (Operator op, Integer arg)
+    public Integer visitBinaryOperator (Operator op, Integer arg)
     {
         String opName = op.spelling;
 
@@ -485,7 +481,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
                 if (debug)
                     System.out.println("Hit the default case in visit binary operator");
         }
-        return (null);
+        return (Integer.valueOf(VOIDRSIZE));
     }
 
     public Integer visitUnaryOperator (Operator op, Integer arg)
@@ -503,7 +499,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
                 if (debug)
                     System.out.println("Hit the default case in visit Unary operator");
         }
-        return (null);
+        return (Integer.valueOf(VOIDRSIZE));
     }
 
     
@@ -513,7 +509,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             System.out.println("In visitIntLiteral");
 
         Machine.emit(Op.LOADL, Integer.valueOf(num.spelling).intValue());
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(BASETSIZE));
     }
     
     public Integer visitBooleanLiteral(BooleanLiteral bool, Integer arg)
@@ -523,7 +519,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             value = 1;
         
         Machine.emit(Op.LOADL, value);
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(BASETSIZE));
     }
 
     public Integer visitLocalRef(LocalRef ref, Integer arg) 
@@ -535,7 +531,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             return (Integer.valueOf(ref.decl.storage.offset));
         }
         Machine.emit(Op.LOAD, Reg.LB, ref.decl.storage.offset);
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(ref.decl.storage.size));
     }
 
     public Integer visitMemberRef(MemberRef ref, Integer arg)
@@ -545,7 +541,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
 
         if (isMethodCall) {
             Machine.emit(Op.LOADA, Reg.OB, 0);
-            Machine.emit(Op.CALLD, ref.decl.storage.offset);
+            Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);
             return (Integer.valueOf(ref.decl.storage.size));
         }
         if (isLHS) {
@@ -593,7 +589,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             System.out.println("In this reference"); 
         if (isMethodCall) {
             Machine.emit(Op.LOADA, Reg.OB, 0);
-            Machine.emit(Op.CALLD, ref.decl.storage.offset);
+            Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);
             return (Integer.valueOf(ref.decl.storage.size));
         }
         if (isLHS) {
@@ -610,7 +606,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         if (ref.decl != null)
             return (Integer.valueOf(ref.decl.storage.size));
         else 
-            return (Integer.valueOf(1));
+            return (Integer.valueOf(ADDRESSSIZE));
     }
 
     public Integer visitDeRef(DeRef ref, Integer arg)
@@ -627,14 +623,12 @@ public class CodeGenerator implements Visitor<Integer, Integer>
 
         // need to revisit this part after completing recursion code.
         ref.ref.visit(this, arg);
-        System.out.println("2In Dereference, isMethodCallLocalFlag"+ isMethodCallLocalFlag);
         
         if (isMethodCallLocalFlag) {
             if (isPrintCall && ref.decl.name.equals("println")) {
-                System.out.println("**In Dereference");
                 Machine.emit(Prim.putint);
             } else {
-                Machine.emit(Op.CALLD, ref.decl.storage.offset);
+                Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);
             }
             return (Integer.valueOf(ref.decl.storage.size));
         }
@@ -648,7 +642,9 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         Machine.emit(Prim.fieldref);
         isMethodCall = isMethodCallLocalFlag;
         isLHS = isLHSLocalFlag;
-        return (Integer.valueOf(1));
+        // this is fool proof as the refernced variable can be 
+        // a object or a primitive type
+        return (Integer.valueOf(ADDRESSSIZE));
     }
 
     public Integer visitArrayLengthRef(ArrayLengthRef ref, Integer arg)
@@ -657,7 +653,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         Machine.emit(Op.LOADL, -1);
         Machine.emit(Prim.add);
         Machine.emit(Op.LOADI);
-        return (Integer.valueOf(1));
+        return (Integer.valueOf(BASETSIZE));
     }
 
 
@@ -682,4 +678,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     public final int LOCALREF = 0;
     public int OP = LOCALREF; // default value
     public boolean isLHS = false;
+    private int ADDRESSSIZE = 1;
+    private int VOIDRSIZE = 0;
+    private int BASETSIZE = 1;
 }

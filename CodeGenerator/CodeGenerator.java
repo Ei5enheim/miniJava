@@ -4,6 +4,7 @@
  * PID:     720367703
  * Course : COMP520
  */
+
 package miniJava.CodeGenerator;
 
 import miniJava.AbstractSyntaxTrees.*;
@@ -17,10 +18,9 @@ import mJAM.Machine.Prim;
 
 public class CodeGenerator implements Visitor<Integer, Integer>
 {
-    private boolean debug = true, secondWalk = false;
+    private boolean debug = false, secondWalk = false;
     private boolean isMethodCall = false, isPrintCall = false;
     int labelMain = 0, patchMe = 0;
-    
     int ST = 0;
 
     public CodeGenerator() 
@@ -36,40 +36,15 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         Machine.emit(Op.LOADL, -1);
         Machine.emit(Op.CALL, Reg.CB, labelMain);
         Machine.emit(Op.HALT, 0, 0, 0);
-
-        String objectCodeFileName = "testfile.mJAM";
-        ObjectFile objF = new ObjectFile(objectCodeFileName);
-        System.out.println("Generating the code file " + objectCodeFileName + " ..:)");
-        if (objF.write()) {
-            System.out.println("FAILED to generate the code file!");
-            return;
-        } else {
-            System.out.println("SUCCEEDED in generating the code file!");
-        }
-        
-        // create the asm file
-        System.out.println("writing assembly file ..");
-
-        Disassembler d = new Disassembler(objectCodeFileName);
-        if (d.disassemble()) {
-            System.out.println("FAILED to generate the assembly file!");
-            return;
-        } else {
-            System.out.println("SUCCEEDED in generating the assembly file!");
-        }
-        System.out.println("Running code ..");
-        Interpreter.interpret(objectCodeFileName);
-        System.out.println("Finished execution");
     }   
     
     // Package
     public Integer visitPackage(Package prog, Integer arg)
     {
-        
         ClassDeclList cl = prog.classDeclList;
 
         for (ClassDecl c: prog.classDeclList) {
-            c.visit(this, null);
+            c.visit(this, Integer.valueOf(0));
         }
         return (Integer.valueOf(VOIDRSIZE));
     }
@@ -89,6 +64,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             for (FieldDecl f: clas.fieldDeclList) {
                 if (f.isStatic) {
                     f.storage.offset = ST;
+                    Machine.emit(Op.PUSH,1);
                     Machine.emit(Op.LOADL,0);
                     Machine.emit(Op.STORE, Reg.SB, ST);
                     ST++;        
@@ -102,10 +78,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             if (clas.methodDeclList.size() > 0)
                 Machine.emit(Op.PUSH, clas.methodDeclList.size());
             ST += 2;
-            System.out.println("**classOffset: " + clas.storage.offset);
             for (MethodDecl m: clas.methodDeclList) {
                 m.storage.offset = methodOffset;
-                System.out.println("**methodOffset: " + methodOffset);
                 ST++;
                 methodOffset++;
             }
@@ -160,6 +134,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         //when returning subtract 3 offset and pop those many elements from the stack
             Machine.emit(Op.RETURN, 0, 0, m.parameterDeclList.size());
         }
+    
+        // useless, but doing it for convention
         return (Integer.valueOf(VOIDRSIZE));
     }
     
@@ -184,11 +160,17 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     public Integer visitBlockStmt(BlockStmt stmt, Integer arg)
     {
         int offset = arg.intValue();
+        int pushCount = 0;
 
         StatementList sl = stmt.sl;
         for (Statement s: sl) {
-             offset += s.visit(this, Integer.valueOf(offset));
+             pushCount += s.visit(this, Integer.valueOf(offset));
+             offset += pushCount;
         }
+    
+        if (pushCount > 0)
+            Machine.emit(Op.POP, pushCount);
+
         return (Integer.valueOf(VOIDRSIZE));
     }
     
@@ -205,6 +187,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     
     public Integer visitAssignStmt (AssignStmt stmt, Integer arg)
     {
+
+        System.out.println("Assignment statement");
         int op = LOCALREF, offset = 0;
         isLHS = true;
         int pushCount = stmt.ref.visit(this, arg).intValue();
@@ -245,9 +229,12 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         int pushCount = pushArgList(stmt.argList, arg).intValue();
         isMethodCall = true;
         //ignoring the return value from a call statement
-        stmt.methodRef.visit(this, Integer.valueOf(
+        pushCount = stmt.methodRef.visit(this, Integer.valueOf(
                              arg.intValue() + pushCount)).intValue();
         isMethodCall = false;
+        if (pushCount > 0)
+            Machine.emit(Op.POP, pushCount);
+
         return (Integer.valueOf(VOIDRSIZE));
     }
     
@@ -349,7 +336,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         int pushCount = expr.sizeExpr.visit(this, arg);
 
         Machine.emit(Prim.newarr); 
-        return (Integer.valueOf(pushCount));
+        return (Integer.valueOf(ADDRESSSIZE));
     }
     
     public Integer visitNewObjectExpr(NewObjectExpr expr, Integer arg)
@@ -393,6 +380,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             System.out.println("In Indexed reference");
 
         int pushCount =  ir.ref.visit(this, arg);
+
+        System.out.println("index reference isLHS: " + isLHS);
 
         if ((OP == LOCALREF) && isLHS) {
             Machine.emit(Op.LOAD,Reg.LB, pushCount);
@@ -530,6 +519,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             OP = LOCALREF;
             return (Integer.valueOf(ref.decl.storage.offset));
         }
+
         Machine.emit(Op.LOAD, Reg.LB, ref.decl.storage.offset);
         return (Integer.valueOf(ref.decl.storage.size));
     }
@@ -560,7 +550,6 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             System.out.println("In class reference");
 
         if (isMethodCall) {
-            System.out.println("**In class reference");
             Machine.emit(Op.LOAD, -1);
             Machine.emit(Op.LOAD, ref.cdecl.storage.offset + 
                                   ref.decl.storage.offset);
@@ -574,7 +563,6 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         }
         // need to remove this check once static fields are implemented
         if (ref.cdecl.name.equals("System") && ref.decl.name.equals("out")) {
-            System.out.println("***In class reference");
             isPrintCall = true;
             return (Integer.valueOf(0));    
         }
@@ -627,14 +615,19 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         if (isMethodCallLocalFlag) {
             if (isPrintCall && ref.decl.name.equals("println")) {
                 Machine.emit(Prim.putint);
+                // since we are not checking the return type in identification
+                //return (Integer.valueOf(VOIDRSIZE));
             } else {
                 Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);
             }
+            isMethodCall = isMethodCallLocalFlag;
+            //System.out.println("name of the method "+ ref.decl.name + "and its return type is " + ref.decl.storage.size);
             return (Integer.valueOf(ref.decl.storage.size));
         }
 
         if (isLHSLocalFlag) {
             OP = MEMREF;
+            isLHS = isLHSLocalFlag;
             Machine.emit(Op.LOADL, ref.decl.storage.offset);
             return (Integer.valueOf(2));
         }

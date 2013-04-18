@@ -326,7 +326,7 @@ public class Identification implements Visitor<String,Object> {
 
     //Types
 
-    public Object visitBaseType(BaseType type, String arg){
+    public Object visitBaseType(BaseType type, String arg) {
         //show(arg, type.typeKind + " " + type.toString());
         return null;
     }
@@ -417,7 +417,7 @@ public class Identification implements Visitor<String,Object> {
                     if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
                         accessThStatic = true;
                         reporter.reportError("Reference involving static variables is"+
-                                             " is not allowed", id.spelling, id.posn);
+                                             " not allowed, ", id.spelling, id.posn);
                     }
                     ref = new MemberRef((MemberDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
@@ -443,7 +443,7 @@ public class Identification implements Visitor<String,Object> {
                 if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
                     accessThStatic = true;
                     reporter.reportError("Reference involving static variables is"+
-                                         " is not allowed", id.spelling, id.posn);
+                                         " not allowed, ", id.spelling, id.posn);
                 }
                 ((ThisRef)ref).setMemberDecl((MemberDecl)decl);
                 classDecl = retrieveClassDecl(decl);
@@ -455,26 +455,29 @@ public class Identification implements Visitor<String,Object> {
             id = ql.get(i);
             name = id.spelling;
             if ((i  == (ql.size() - 1)) && 
-                    isArrayType(decl)  && (name.equals("length"))) {
+                  !shouldBStatic        && 
+                  name.equals("length") &&
+                  isArrayType(decl)) {
                 isLengthRef = true;
             }
+
             // need this check for length field
             if ((classDecl == null) && !isLengthRef) { 
                 reporter.reportError("unable to derefence variable-", id.spelling, id.posn);
                 return (qr);
             }
+
             if (!isLengthRef)
                 className = classDecl.name;
             // Method name is passed as an argument
+
             if (i  == (ql.size() - 1)) {
                 if (isMethodCall) {
                     decl = retrieveMethodDeclaration(classDecl, name);
                     if (debug)
                         System.out.println("Found method declaration for "+name);
                 // below check ensures that Class.length is skipped because of the array type check
-                } else if (!shouldBStatic &&
-                            (name.equals("length")) && 
-                            isArrayType(decl)) {
+                } else if (isLengthRef) {
                     skipLookup = true;
                     if (debug)
                         System.out.println("insdide skipcode "+name);
@@ -516,7 +519,7 @@ public class Identification implements Visitor<String,Object> {
                         !isSystemClass) {
                         accessThStatic = true;
                         reporter.reportError("Reference involving static variables is"+
-                                             " is not allowed", id.spelling, id.posn);
+                                             " not allowed, ", id.spelling, id.posn);
                     } 
                 } else {
                     reporter.reportError("cannot find symbol - variable- " +
@@ -661,10 +664,12 @@ public class Identification implements Visitor<String,Object> {
         Type typarg = new BaseType(TypeKind.INT, pos);
         FieldDecl fieldDecl = new FieldDecl(false, false, typ, "println", pos);
         fieldDecl.isPublic = true;
+        //fieldDecl.storage.size = 0;
         paraDecl = new ParameterDecl(typarg, "n", pos);
         ParameterDeclList paraList = new ParameterDeclList();
         paraList.add(paraDecl);
         MethodDecl decl = new MethodDecl(fieldDecl, paraList, new StatementList(), null, pos);
+        decl.storage.size = 0;
         methodDeclList.add(decl);
         classDecl = new ClassDecl("_PrintStream", fieldDeclList, methodDeclList, pos);
         return classDecl;

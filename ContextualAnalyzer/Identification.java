@@ -357,7 +357,7 @@ public class Identification implements Visitor<String,Object> {
         String name = null, className = null;
         boolean isMethodCall = false, isStatic = false, isPrivate = false;
         boolean isLocalVar = false, shouldBStatic = false, skipLookup = false;
-        boolean isLengthRef = false;
+        boolean isLengthRef = false, isOutVar = false;
         boolean accessThStatic = false, isSystemClass = false;
         IdentifierList ql = qr.qualifierList;
     
@@ -416,8 +416,9 @@ public class Identification implements Visitor<String,Object> {
                     // need to remove this check after PA4
                     if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
                         accessThStatic = true;
-                        reporter.reportError("Reference involving static variables is"+
+                        /** reporter.reportError("Reference involving static variables is"+
                                              " not allowed, ", id.spelling, id.posn);
+                         */
                     }
                     ref = new MemberRef((MemberDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
@@ -514,13 +515,14 @@ public class Identification implements Visitor<String,Object> {
                     }
                     classDecl = retrieveClassDecl(decl);
                     // need to remove this check after PA4
-                    if (isStatic && (i  != (ql.size() - 1)) &&
-                        !accessThStatic && (!name.equals("out")) &&
-                        !isSystemClass) {
+                    if (isSystemClass && name.equals("out") && 
+                        (classDecl != null) && 
+                        classDecl.name.equals("_PrintStream"))
+                        isOutVar = true;
+                    if (isStatic && !isOutVar){
                         accessThStatic = true;
-                        reporter.reportError("Reference involving static variables is"+
-                                             " not allowed, ", id.spelling, id.posn);
-                    } 
+                    }
+                    isSystemClass = false; 
                 } else {
                     reporter.reportError("cannot find symbol - variable- " +
                                          id.spelling +" in class: " + className,
@@ -539,6 +541,9 @@ public class Identification implements Visitor<String,Object> {
             ((MemberDecl) decl).isStatic) {
             reporter.reportError("PA3 no static access error", id.spelling, id.posn);
             // report error "PA3 no static access error"
+        } else if (accessThStatic) {
+            reporter.reportError("Reference involving static variables is"+
+                    " not allowed, ", "", qr.posn);
         }
         return ref;
     }

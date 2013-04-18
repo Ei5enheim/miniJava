@@ -19,7 +19,8 @@ import mJAM.Machine.Prim;
 public class CodeGenerator implements Visitor<Integer, Integer>
 {
     private boolean debug = false, secondWalk = false;
-    private boolean isMethodCall = false, isPrintCall = false;
+    private boolean isMethodCall = false, isPrintCall = false;  
+    private boolean isMainMethod = false;
     int labelMain = 0, patchMe = 0;
     int ST = 0;
 
@@ -92,11 +93,13 @@ public class CodeGenerator implements Visitor<Integer, Integer>
                 if (clas.containsMain && m.name.equals("main")) {
                     // label of main method
                     labelMain = Machine.nextInstrAddr() + 1;
+                    isMainMethod = true;
                 }
                 patchMe = Machine.nextInstrAddr();
                 Machine.emit(Op.JUMP, Reg.CB, 0);
                 m.visit(this, Integer.valueOf(0));
                 Machine.patch(patchMe, Machine.nextInstrAddr()); 
+                isMainMethod = false;
             }   
         }
         return (Integer.valueOf(VOIDRSIZE));
@@ -132,7 +135,10 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             Machine.emit(Op.RETURN, pushCount, 0, m.parameterDeclList.size());
         } else {
         //when returning subtract 3 offset and pop those many elements from the stack
-            Machine.emit(Op.RETURN, 0, 0, m.parameterDeclList.size());
+            if (!isMainMethod)
+                Machine.emit(Op.RETURN, 0, 0, m.parameterDeclList.size());
+            else 
+                Machine.emit(Op.RETURN, 0, 0, 0);
         }
     
         // useless, but doing it for convention

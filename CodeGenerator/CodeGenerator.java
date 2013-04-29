@@ -193,8 +193,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     
     public Integer visitAssignStmt (AssignStmt stmt, Integer arg)
     {
-
-        System.out.println("Assignment statement");
+        if (debug)
+            System.out.println("Assignment statement");
         int op = LOCALREF, offset = 0;
         isLHS = true;
         int pushCount = stmt.ref.visit(this, arg).intValue();
@@ -387,7 +387,8 @@ public class CodeGenerator implements Visitor<Integer, Integer>
 
         int pushCount =  ir.ref.visit(this, arg);
 
-        System.out.println("index reference isLHS: " + isLHS);
+        if (debug)
+            System.out.println("index reference isLHS: " + isLHS);
 
         if ((OP == LOCALREF) && isLHS) {
             Machine.emit(Op.LOAD,Reg.LB, pushCount);
@@ -581,6 +582,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
     {
         if (debug)
             System.out.println("In this reference"); 
+
         if (isMethodCall) {
             Machine.emit(Op.LOADA, Reg.OB, 0);
             Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);

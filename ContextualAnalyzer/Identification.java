@@ -393,7 +393,7 @@ public class Identification implements Visitor<String,Object> {
             }
 	    level = table.retrieveLevel(name);
             if  (debug) {
-                System.out.println("level = " + level + " of id = "+ id.spelling );
+                 System.out.println("level = " + level + " of id = "+ id.spelling );
             }
             if (ref == null) {   
                 if (level > SymbolTable.MEMBERLEVEL) {

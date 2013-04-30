@@ -305,9 +305,26 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             System.out.println("In visitBinaryExpr");
 
         int pushCount = expr.left.visit(this, arg).intValue();
-        expr.right.visit(this, Integer.valueOf(arg.intValue()+ pushCount));
-        visitBinaryOperator(expr.operator, arg);
 
+        if (expr.operator.spelling.equals("&&")) {
+            Machine.emit(Op.LOAD, Reg.ST, -1);
+            int jumpToEnd = Machine.nextInstrAddr();
+            Machine.emit(Op.JUMPIF, 0, Reg.CB, 0);
+            expr.right.visit(this, Integer.valueOf(arg.intValue()+ pushCount));
+            visitBinaryOperator(expr.operator, arg);
+            Machine.patch(jumpToEnd, Machine.nextInstrAddr()); 
+            
+        } else if (expr.operator.spelling.equals("||")) {
+            Machine.emit(Op.LOAD, Reg.ST, -1);
+            int jumpToEnd = Machine.nextInstrAddr();
+            Machine.emit(Op.JUMPIF, 1, Reg.CB, 0);
+            expr.right.visit(this, Integer.valueOf(arg.intValue()+ pushCount));
+            visitBinaryOperator(expr.operator, arg);
+            Machine.patch(jumpToEnd, Machine.nextInstrAddr());
+        } else {
+            expr.right.visit(this, Integer.valueOf(arg.intValue()+ pushCount));
+            visitBinaryOperator(expr.operator, arg);
+        }
         return (Integer.valueOf(pushCount));
     }
     

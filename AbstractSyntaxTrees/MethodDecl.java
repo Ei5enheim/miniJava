@@ -23,4 +23,5 @@ public class MethodDecl extends MemberDecl {
 	public ParameterDeclList parameterDeclList;
 	public StatementList statementList;
 	public Expression returnExp;
+	public String mangledName;
 }

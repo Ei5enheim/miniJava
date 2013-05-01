@@ -50,7 +50,7 @@ public interface Visitor<ArgType,ResultType> {
     //public Reference visitQualifiedRef(QualifiedRef ref);
     public ResultType visitLocalRef(LocalRef ref, ArgType arg);
     public ResultType visitMemberRef(MemberRef ref, ArgType arg);
-    public ResultType visitClassRef(ClassRef ref, ArgType arg);
+    public ResultType visitStaticRef(StaticRef ref, ArgType arg);
     public ResultType visitThisRef(ThisRef ref, ArgType arg);
     public ResultType visitDeRef(DeRef ref, ArgType arg);
     public ResultType visitArrayLengthRef(ArrayLengthRef ref, ArgType arg);
@@ -59,4 +59,5 @@ public interface Visitor<ArgType,ResultType> {
     public ResultType visitOperator(Operator op, ArgType arg);
     public ResultType visitIntLiteral(IntLiteral num, ArgType arg);
     public ResultType visitBooleanLiteral(BooleanLiteral bool, ArgType arg);
+    public ResultType visitNullLiteral(NullLiteral Null, ArgType arg);
 }

@@ -17,15 +17,19 @@ public class Identification implements Visitor<String,Object> {
     private SymbolTable table;
     private boolean isStaticMethod = false, mainMethodFound = false;
     private boolean userDefinedStringClass = false;
+    private boolean userDefinedSystemClass = false;
     private String currentClass = null;
     private ErrorReporter reporter;
     private VarDecl lVariable = null;
     boolean mainClassfound = false;
-    
+    private MemberDecl out = null;
+    StringBuilder str;
+       
     public Identification() 
     {
         // we are going to use the same table for both walks as 
         // everything is added in the first walk will be removed
+        str = new StringBuilder();
         table = new SymbolTable();
         reporter = new ErrorReporter();
         // adding the standard environment in the zero level
@@ -41,6 +45,10 @@ public class Identification implements Visitor<String,Object> {
         if (table.retrieveLevel("String") != SymbolTable.PREDEFINEDLEVEL) {
             userDefinedStringClass = true;
         }
+        if (table.retrieveLevel("System") != SymbolTable.PREDEFINEDLEVEL) {
+            userDefinedSystemClass = true;
+            System.out.println("user defined system class");
+        }
         secondWalk = true;
         ast.visit(this,null);
         // done with this check
@@ -54,6 +62,8 @@ public class Identification implements Visitor<String,Object> {
         }
         if (reporter.errorCount > 0)
             System.exit(4);
+        
+        
     }   
     
     // Package
@@ -63,7 +73,13 @@ public class Identification implements Visitor<String,Object> {
         for (ClassDecl c: prog.classDeclList){
             c.visit(this, null);
         }
-
+        
+        if (secondWalk)
+        {
+            prog.classDeclList.add((ClassDecl)table.retrievePDefClassDecl("String"));
+            prog.classDeclList.add((ClassDecl)table.retrievePDefClassDecl("System"));
+            prog.classDeclList.add((ClassDecl)table.retrievePDefClassDecl("_PrintStream"));
+        }
         return null;
     }
     
@@ -101,10 +117,12 @@ public class Identification implements Visitor<String,Object> {
 
             for (MethodDecl m: clas.methodDeclList) {
                 if ((table.retrieveMemberDecl(m.name) != null) ||
-                    (table.retrieveMemberDecl(m.name+"function") != null)) {
+                    (table.retrieveMemberDecl(m.name+"@function") != null)) {
                     reporter.reportError(m.name+" is already defined in the class", "", m.posn);
-                }  else if (table.add(m.name+"function", m)) {
-                    reporter.reportError("Method" +m.name+" is already defined in the class", "", m.posn);
+                }  else if (table.add(m.name+"@function", m)) { 
+                        reporter.reportError("Method" +m.name+" wth parameters: " +
+                                             m.parameterDeclList + " is already defined in the class", 
+                                             "", m.posn);
                 }
                 m.storage.offset = methodOffset++; 
             }
@@ -124,6 +142,37 @@ public class Identification implements Visitor<String,Object> {
         }
         return null;
     }
+
+    /*
+    public String pdListToString (ParameterDeclList pdl)
+    {
+        StringBuilder str = new StringBuilder();
+        for (ParameterDecl pd: pdl) {
+            str.append(pd.type.toString());
+            str.append(",");
+        }
+        str.delete(str.length()-1, str.length());
+        return (str.toString());
+    }
+    
+
+    public String mangleRoutineName (MethodDecl m) 
+    {
+        String name = null;
+        str.append(m.name);
+        str.append("function");
+        ParameterDeclList pdl = m.parameterDeclList;
+        for (ParameterDecl pd: pdl) {
+            str.append('@');
+            str.append(pd.type.toString());
+        }
+        name = str.toString();
+        if (debug)
+            System.out.println("mangled name: " + name);
+        str.delete(0, str.length());
+
+        return(name);
+    }*/
     
     public Object visitFieldDecl(FieldDecl f, String arg)
     {
@@ -172,7 +221,18 @@ public class Identification implements Visitor<String,Object> {
             reporter.reportError("More than one public static void main (String[] args) method found in the program",
 				 "", m.posn);
         }
-        
+
+        // Initializing the System.out variable
+        if (!userDefinedSystemClass) {
+            SourcePosition pos = new SourcePosition();
+            StaticRef ref = new StaticRef((ClassDecl) table.retrieveClassDecl("System"),
+                                        out, pos); 
+            ClassType type = new ClassType("_PrintStream", pos);
+            type.classDecl = (ClassDecl) table.retrieveClassDecl("_PrintStream");
+            Expression expr = new NewObjectExpr(type, pos);           
+            Statement stmt =  new AssignStmt(ref, expr, pos);
+            m.statementList.add(0, stmt);
+        } 
 	mainMethodFound = true;
         
     }
@@ -182,9 +242,11 @@ public class Identification implements Visitor<String,Object> {
         table.newScope(true); 
         isStaticMethod = m.isStatic;
 
+        /*
         if (m.name.equals("main")) {
            visitMainMethodDecl(m);
         } 
+        */
         // checking for return type;       
         m.type.visit(this,null); 
         
@@ -206,6 +268,9 @@ public class Identification implements Visitor<String,Object> {
         }
         table.closeScope(true);
     
+        if (m.name.equals("main")) {
+           visitMainMethodDecl(m);
+        }
         return null;
     }
     
@@ -368,69 +433,63 @@ public class Identification implements Visitor<String,Object> {
             reporter.reportError("this cannot be referenced " + 
                                  "from a static method", " ", qr.posn);
             return (qr);
-        } else if (qr.thisRelative){
-	    if (isMethodCall && ql.size() < 1) {
-		reporter.reportError("cannot find symbol - method-", "this", qr.posn);
+        } else if (qr.thisRelative) {
+            if (isMethodCall && ql.size() < 1) {
+                reporter.reportError("cannot find symbol - method-", "this", qr.posn);
                 return (qr);
-	    }
-	    decl = table.retrieve(currentClass);
+            }
+            decl = table.retrieve(currentClass);
             ref = new ThisRef((ClassDecl) decl, qr.posn);
         }
 
         if (ql.size() > 0) {
             id = ql.get(0);
-            if (isMethodCall && ql.size() == 1) {
+            if ((ql.size() == 1) && isMethodCall) {
                 if (debug)
                     System.out.println("doing method search");
-                name = id.spelling + "function";
+                name = id.spelling + "@function";
             } else {
                 name = id.spelling;
             }
-           
+
             if ((decl = table.retrieve(name)) == null) {
                 reporter.reportError("cannot find symbol -", id.spelling, id.posn);
                 return (qr);
             }
-	    level = table.retrieveLevel(name);
+            level = table.retrieveLevel(name);
             if  (debug) {
-                 System.out.println("level = " + level + " of id = "+ id.spelling );
+                System.out.println("level = " + level + " of id = "+ id.spelling );
             }
             if (ref == null) {   
                 if (level > SymbolTable.MEMBERLEVEL) {
+                    // int x = x + y --> blocks these kind of stmts
                     if (decl == lVariable) {
                         reporter.reportError("usage of uninitialized variable-'" + id.spelling +
-                                             "'", " ", id.posn);
+                                "'", " ", id.posn);
                         return (qr);
                     }
                     ref = new LocalRef((LocalDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
-                    isLocalVar = true;
                 } else if (level == SymbolTable.MEMBERLEVEL) {
                     if (isStaticMethod && !(((MemberDecl)decl).isStatic)) {
                         reporter.reportError("non static variable ' " + id.spelling + 
-                                             " ' cannot be referenced from a static context ", 
-                                             " ", id.posn);
+                                " ' cannot be referenced from a static context ", 
+                                " ", id.posn);
                         return (qr);
                     } 
-                    // ensuring that it is access through static vars
-                    // need to remove this check after PA4
-                    if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
-                        accessThStatic = true;
-                        /** reporter.reportError("Reference involving static variables is"+
-                                             " not allowed, ", id.spelling, id.posn);
-                         */
+                    if ((((MemberDecl)decl).isStatic)) {
+                        ref = new StaticRef((ClassDecl) table.retrieve(currentClass),
+                                (MemberDecl) decl, qr.posn);
+                    } else {
+                        ref = new MemberRef((MemberDecl) decl, qr.posn);
                     }
-                    ref = new MemberRef((MemberDecl) decl, qr.posn);
                     classDecl = retrieveClassDecl(decl);
                 } else if (((level == SymbolTable.CLASSLEVEL) || 
                             (level == SymbolTable.PREDEFINEDLEVEL)) && 
-                           (ql.size() != 1)) {
-                    ref = new ClassRef((ClassDecl) decl, qr.posn);
+                            (ql.size() != 1)) {
+                    ref = new StaticRef((ClassDecl) decl, qr.posn);
                     classDecl = decl;
                     shouldBStatic = true;
-                    // need to remove after pa4
-                    if (name.equals("System"))
-                        isSystemClass = true;
                 } else {
                     reporter.reportError("cannot find symbol - variable ", id.spelling, id.posn);
                     return (qr);
@@ -440,110 +499,76 @@ public class Identification implements Visitor<String,Object> {
                     reporter.reportError("cannot find symbol -", id.spelling, id.posn);
                     return (qr);
                 }
-                // need to remove this check after PA4
-                if ((((MemberDecl)decl).isStatic) && (ql.size() > 1)) {
-                    accessThStatic = true;
-                    reporter.reportError("Reference involving static variables is"+
-                                         " not allowed, ", id.spelling, id.posn);
+                if (((MemberDecl)decl).isStatic) {
+                    ref = new StaticRef((ClassDecl) table.retrieve(currentClass),
+                                        (MemberDecl)decl, qr.posn);
+                } else {
+                    ((ThisRef)ref).setMemberDecl((MemberDecl)decl);
                 }
-                ((ThisRef)ref).setMemberDecl((MemberDecl)decl);
                 classDecl = retrieveClassDecl(decl);
             }      
-        }
 
-        for (int i = 1; i < ql.size(); i++) {
-            isLocalVar = false;
-            id = ql.get(i);
-            name = id.spelling;
-            if ((i  == (ql.size() - 1)) && 
-                  !shouldBStatic        && 
-                  name.equals("length") &&
-                  isArrayType(decl)) {
-                isLengthRef = true;
-            }
+            for (int i = 1; i < ql.size(); i++) {
+                id = ql.get(i);
+                name = id.spelling;
 
-            // need this check for length field
-            if ((classDecl == null) && !isLengthRef) { 
-                reporter.reportError("unable to derefence variable-", id.spelling, id.posn);
-                return (qr);
-            }
-
-            if (!isLengthRef)
-                className = classDecl.name;
-            // Method name is passed as an argument
-
-            if (i  == (ql.size() - 1)) {
-                if (isMethodCall) {
-                    decl = retrieveMethodDeclaration(classDecl, name);
-                    if (debug)
-                        System.out.println("Found method declaration for "+name);
-                // below check ensures that Class.length is skipped because of the array type check
-                } else if (isLengthRef) {
-                    skipLookup = true;
-                    if (debug)
-                        System.out.println("insdide skipcode "+name);
+                // check for the length field of arrays
+                if ((i  == (ql.size() - 1)) && 
+                      !shouldBStatic        &&  // to block isArrayType() call on class decls 
+                      name.equals("length") &&
+                      isArrayType(decl)) {
+                    ref = new ArrayLengthRef(ref, id.posn);
                 } else {
-                    decl = retrieveFieldDeclaration(classDecl, name);
-                    if (debug)
-                        System.out.println("Found field declaration for "+name);
-                }
-            } else { 
-                decl = retrieveFieldDeclaration(classDecl, name);
-                if (debug)
-                    System.out.println("Found field declaration for "+name);
-            } 
-            if (!skipLookup) {
-                if (decl != null) {
-                    isStatic = ((MemberDecl) decl).isStatic;
-                    isPrivate = ((MemberDecl) decl).isPrivate;
-
-                    if (isPrivate && !className.equals(currentClass)) {
-                        reporter.reportError(id.spelling + " has private access in ",
-                                             className, id.posn);
+                    if ((classDecl == null)) { 
+                        reporter.reportError("unable to derefence variable-", id.spelling, id.posn);
                         return (qr);
                     }
-                    if ((shouldBStatic) && (i == 1) && !isStatic) {
-                        reporter.reportError("non static variable ' " + id.spelling +
-                                "' :cannot be referenced from a static context ",
-                                " ", id.posn);
-                        return (qr);
-                    } else if ((shouldBStatic) && (i == 1)) {
-                        ((ClassRef)ref).decl = (MemberDecl)decl;
-                        shouldBStatic = false;
+                    className = classDecl.name;
+                    // Method name is passed as an argument
+
+                    if ((i  == (ql.size() - 1)) && isMethodCall) {
+                        decl = retrieveMethodDeclaration(classDecl, name);
+                        if (debug)
+                            System.out.println("Found method declaration for "+name);
                     } else { 
-                        ref = new DeRef(ref, (MemberDecl)decl, id.posn);
-                    }
-                    classDecl = retrieveClassDecl(decl);
-                    // need to remove this check after PA4
-                    if (isSystemClass && name.equals("out") && 
-                        (classDecl != null) && 
-                        classDecl.name.equals("_PrintStream"))
-                        isOutVar = true;
-                    if (isStatic && !isOutVar){
-                        accessThStatic = true;
-                    }
-                    isSystemClass = false; 
-                } else {
-                    reporter.reportError("cannot find symbol - variable- " +
-                                         id.spelling +" in class: " + className,
-                                         "", id.posn);
-                    return (qr);
-                }    
-            } else {
-                ref = new ArrayLengthRef(ref, id.posn);
+                        decl = retrieveFieldDeclaration(classDecl, name);
+                        if (debug)
+                            System.out.println("Found field declaration for "+name);
+                    } 
+                    if (decl != null) {
+                        isStatic = ((MemberDecl) decl).isStatic;
+                        isPrivate = ((MemberDecl) decl).isPrivate;
+
+                        if (isPrivate && !className.equals(currentClass)) {
+                            reporter.reportError(id.spelling + " has private access in ",
+                                    className, id.posn);
+                            return (qr);
+                        }
+                        if ((shouldBStatic) && (i == 1) && !isStatic) {
+                            reporter.reportError("non static variable ' " + id.spelling +
+                                    "' :cannot be referenced from a static context ",
+                                    " ", id.posn);
+                            return (qr);
+                        } else if ((shouldBStatic) && (i == 1)) {
+                            ((StaticRef)ref).decl = (MemberDecl)decl;
+                            shouldBStatic = false;
+                        } else { 
+                            if (isStatic) {
+                                ref = new StaticRef((ClassDecl) classDecl ,
+                                        (MemberDecl) decl, id.posn);
+                            } else {
+                                ref = new DeRef(ref, (MemberDecl)decl, id.posn);
+                            }
+                        }
+                        classDecl = retrieveClassDecl(decl);
+                    } else {
+                        reporter.reportError("cannot find symbol - variable- " +
+                                id.spelling +" in class: " + className,
+                                "", id.posn);
+                        return (qr);
+                    }    
+                }
             }
-        }
-	/**  check to prevent static access and referencing class, 
-          * ignoring if "this" is being referenced or array length is referenced
-          */
-        if (!skipLookup && !isLocalVar && 
-            !(qr.thisRelative && (ql.size() < 1)) && 
-            ((MemberDecl) decl).isStatic) {
-            reporter.reportError("PA3 no static access error", id.spelling, id.posn);
-            // report error "PA3 no static access error"
-        } else if (accessThStatic) {
-            reporter.reportError("Reference involving static variables is"+
-                    " not allowed, ", "", qr.posn);
         }
         return ref;
     }
@@ -567,7 +592,7 @@ public class Identification implements Visitor<String,Object> {
     public Declaration retrieveFieldDeclaration (Declaration decl, String key)
     {
         ClassDecl clas = (ClassDecl) decl;
-        
+
         for (FieldDecl f: clas.fieldDeclList) {
             if (key.equals(f.name)) {
                 return (f);
@@ -594,34 +619,39 @@ public class Identification implements Visitor<String,Object> {
     }    
 
     public Object visitIndexedRef(IndexedRef ir, String arg) {
-    	//show(arg, ir);
+        //show(arg, ir);
         ir.ref = (Reference) ir.ref.visit(this, null);
-    	ir.indexExpr.visit(this, null);
-    	return ir;
+        ir.indexExpr.visit(this, null);
+        return ir;
     }
-    
-  // Terminals
+
+    // Terminals
     public Object visitIdentifier(Identifier id, String arg){
         //show(arg, "\"" + id.spelling + "\" " + id.toString());
         return null;
     }
-    
+
     public Object visitOperator(Operator op, String arg){
         //show(arg, "\"" + op.spelling + "\" " + op.toString());
         return null;
     }
-    
+
     public Object visitIntLiteral(IntLiteral num, String arg){
         //show(arg, "\"" + num.spelling + "\" " + num.toString());
         return null;
     }
-    
+
     public Object visitBooleanLiteral(BooleanLiteral bool, String arg){
         //show(arg, "\"" + bool.spelling + "\" " + bool.toString());
         return null;
     }
 
-    
+    public Object visitNullLiteral(NullLiteral Null, String arg){
+        //show(arg, "\"" + bool.spelling + "\" " + bool.toString());
+        return null;
+    }
+
+
     public Object visitLocalRef(LocalRef ref, String arg) 
     {
         return null;
@@ -632,7 +662,7 @@ public class Identification implements Visitor<String,Object> {
         return null;
     }
 
-    public Object visitClassRef(ClassRef ref, String arg)
+    public Object visitStaticRef(StaticRef ref, String arg)
     {
         return null;
     }
@@ -664,7 +694,7 @@ public class Identification implements Visitor<String,Object> {
         FieldDeclList fieldDeclList = new FieldDeclList();
         MethodDeclList methodDeclList = new MethodDeclList();
         SourcePosition pos = new SourcePosition();
-    
+
         Type typ = new BaseType(TypeKind.VOID, pos);
         Type typarg = new BaseType(TypeKind.INT, pos);
         FieldDecl fieldDecl = new FieldDecl(false, false, typ, "println", pos);
@@ -690,6 +720,7 @@ public class Identification implements Visitor<String,Object> {
         typ.classDecl = printStreamClass;
         FieldDecl fieldDecl = new FieldDecl(false, true, typ, "out", pos);
         fieldDecl.isPublic = true;
+        out = fieldDecl;
         fieldDeclList.add(fieldDecl);
         classDecl = new ClassDecl("System", fieldDeclList, methodDeclList, pos);
         return classDecl;
@@ -699,12 +730,12 @@ public class Identification implements Visitor<String,Object> {
     {
         ClassDecl printStreamClass = addPrintStreamClassDef();
         table.add("_PrintStream", printStreamClass);
-        
+
         ClassDecl systemClass = addSystemClassDef(printStreamClass);
         table.add("System", systemClass);
         ClassDecl stringClass = addStringClassDef();
         table.add("String", stringClass);
 
     }
-    
+
 }

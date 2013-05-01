@@ -21,6 +21,9 @@ public class ClassType extends Type
 
     public String toString()
     {
+        if (className.equals("null"))
+            return ("<nulltype>");
+    
 	return (className);
     }
     public String className;

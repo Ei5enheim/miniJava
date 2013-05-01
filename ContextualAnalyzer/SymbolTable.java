@@ -131,6 +131,19 @@ public class SymbolTable
        return (null);
     }
 
+    public Declaration retrievePDefClassDecl (String key)
+    {
+        HashMap<String, STEntry> innerTable = null;        
+
+       innerTable = symbolTable.get(PREDEFINEDLEVEL);
+
+       if (innerTable.containsKey(key)) {
+           return (innerTable.get(key).astNode);
+       }
+       return (null);
+    }
+
+
     public Declaration retrieveMemberDecl (String key)
     {
         int index = MEMBERLEVEL;

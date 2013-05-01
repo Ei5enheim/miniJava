@@ -18,6 +18,7 @@ public class Checker implements Visitor<Object,Type>
     private final BaseType intType;
     private final BaseType voidType;
     private final BaseType declType;
+    private final ClassType nullType;
     private boolean debug = false, isThisObjRef = false, arrayLRef = false;
     private final SourcePosition pos = new SourcePosition();
 
@@ -29,6 +30,7 @@ public class Checker implements Visitor<Object,Type>
         intType = new BaseType(TypeKind.INT, pos);
         voidType = new BaseType(TypeKind.VOID, pos);
         declType = new BaseType(TypeKind.DECLARATION, pos);
+        nullType = new ClassType("null", pos);
     }
 
     public void typeCheck (AST ast)
@@ -491,6 +493,7 @@ public class Checker implements Visitor<Object,Type>
         }
         return (null);
     }
+
     public Type visitUnaryOperator (Operator op, Type type1)
     {
         String opName = op.spelling;
@@ -527,6 +530,12 @@ public class Checker implements Visitor<Object,Type>
     {
         return booleanType;
     }
+
+    public Type visitNullLiteral(NullLiteral Null, Object arg)
+    {
+        return nullType;
+    }
+
 
     boolean isUnsupportedType (Type t)
     {
@@ -577,7 +586,7 @@ public class Checker implements Visitor<Object,Type>
         return (type);
     }
 
-    public Type visitClassRef(ClassRef ref, Object arg)
+    public Type visitStaticRef(StaticRef ref, Object arg)
     {
         Type type = null;
 
@@ -734,6 +743,10 @@ public class Checker implements Visitor<Object,Type>
     {
         ClassType typea = (ClassType) type1;
         ClassType typeb = (ClassType) type2;
+
+        if (typea.className.equals ("null") ||
+            typeb.className.equals ("null"))
+            return (true);
 
         if (typea.className.equals(typeb.className)) {
             //System.out.println("returning true for classname "+ typeb.className);

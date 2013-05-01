@@ -413,10 +413,6 @@ public class Parser
                 break;
             // case for a statement starting with a class identifier
             case (Keywords.IDENTIFIER):
-            case (Keywords.NUMBER):
-            // added this part of the code to handle true = false
-            // case (Keywords.TRUE):
-            // case (Keywords.FALSE):
                 if (match(Keywords.LBRACKET)) {
                     acceptTAndLookahead();
                     if (match(Keywords.RBRACKET)) {
@@ -841,6 +837,9 @@ public class Parser
         case (Keywords.TRUE):
         case (Keywords.FALSE):
             ast = new LiteralExpr (new BooleanLiteral(name, pos), pos);
+            break;
+        case (Keywords.NULL):
+            ast  = new LiteralExpr (new NullLiteral(pos), pos);
             break;
             // case for an expression of the "new ..."
         case (Keywords.NEW):

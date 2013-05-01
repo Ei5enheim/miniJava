@@ -19,5 +19,5 @@ public class LiteralExpr extends Expression
     }
 
     public Literal literal;
-    public Type type;
+   
 }

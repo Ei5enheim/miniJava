@@ -285,7 +285,11 @@ public class ASTDisplay implements Visitor<String,Object> {
         return null;
     }
 
- 
+    public Object visitNullLiteral(NullLiteral num, String arg){
+        show(arg, "\"" + num.spelling + "\" " + num.toString());
+        return null;
+    }
+
     public Object visitLocalRef(LocalRef ref, String arg)
     {
         return null;
@@ -301,7 +305,7 @@ public class ASTDisplay implements Visitor<String,Object> {
         return null;
     }
 
-    public Object visitClassRef(ClassRef ref, String arg) 
+    public Object visitStaticRef(StaticRef ref, String arg) 
     {
         return null;
     }

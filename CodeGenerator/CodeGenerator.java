@@ -97,13 +97,24 @@ public class CodeGenerator implements Visitor<Integer, Integer>
                 }
                 patchMe = Machine.nextInstrAddr();
                 Machine.emit(Op.JUMP, Reg.CB, 0);
-                m.visit(this, Integer.valueOf(0));
+                if (m.name.equals("println") && clas.name.equals("_PrintStream")) {
+                    generatePrintlnCode();
+                } else {
+                    m.visit(this, Integer.valueOf(0));
+                }
                 Machine.patch(patchMe, Machine.nextInstrAddr()); 
                 isMainMethod = false;
             }   
         }
         return (Integer.valueOf(VOIDRSIZE));
     } 
+
+    public void generatePrintlnCode()
+    {
+        Machine.emit(Op.LOAD, Reg.LB, -1);
+        Machine.emit(Prim.putint);  
+        Machine.emit(Op.RETURN, 0, 0, 1);
+    }
 
     public Integer visitFieldDecl(FieldDecl f, Integer arg)
     {
@@ -535,6 +546,12 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         return (Integer.valueOf(BASETSIZE));
     }
 
+    public Integer visitNullLiteral(NullLiteral Null, Integer arg)
+    {
+        Machine.emit(Op.LOADL, 0);
+        return (Integer.valueOf(BASETSIZE));
+    }
+
     public Integer visitLocalRef(LocalRef ref, Integer arg) 
     {
         if (debug)
@@ -568,14 +585,14 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         return (Integer.valueOf(ref.decl.storage.size));
     }
 
-    public Integer visitClassRef(ClassRef ref, Integer arg)
+    public Integer visitStaticRef(StaticRef ref, Integer arg)
     {
         if (debug)
             System.out.println("In class reference");
 
         if (isMethodCall) {
-            Machine.emit(Op.LOAD, -1);
-            Machine.emit(Op.LOAD, ref.cdecl.storage.offset + 
+            Machine.emit(Op.LOADL, -1);
+            Machine.emit(Op.LOAD, Reg.SB, ref.cdecl.storage.offset + 2 + 
                                   ref.decl.storage.offset);
             Machine.emit(Op.CALLI);
             return (Integer.valueOf(ref.decl.storage.size));
@@ -585,11 +602,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
             OP = STATICREF;
             return (Integer.valueOf(ref.decl.storage.offset));
         }
-        // need to remove this check once static fields are implemented
-        if (ref.cdecl.name.equals("System") && ref.decl.name.equals("out")) {
-            isPrintCall = true;
-            return (Integer.valueOf(0));    
-        }
+
         Machine.emit(Op.LOAD, Reg.SB, ref.decl.storage.offset);
         return (Integer.valueOf(ref.decl.storage.size));
  
@@ -638,13 +651,7 @@ public class CodeGenerator implements Visitor<Integer, Integer>
         ref.ref.visit(this, arg);
         
         if (isMethodCallLocalFlag) {
-            if (isPrintCall && ref.decl.name.equals("println")) {
-                Machine.emit(Prim.putint);
-                // since we are not checking the return type in identification
-                //return (Integer.valueOf(VOIDRSIZE));
-            } else {
-                Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);
-            }
+            Machine.emit(Op.CALLD, ref.decl.storage.offset, 0, 0);
             isMethodCall = isMethodCallLocalFlag;
             //System.out.println("name of the method "+ ref.decl.name + "and its return type is " + ref.decl.storage.size);
             return (Integer.valueOf(ref.decl.storage.size));

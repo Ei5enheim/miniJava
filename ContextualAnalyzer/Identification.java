@@ -13,7 +13,7 @@ import miniJava.AbstractSyntaxTrees.Package;
 
 public class Identification implements Visitor<String,Object> {
 	
-    private boolean secondWalk = false, debug = false;
+    private boolean secondWalk = false, debug = true;
     private SymbolTable table;
     private boolean isStaticMethod = false, mainMethodFound = false;
     private boolean userDefinedStringClass = false;
@@ -479,7 +479,7 @@ public class Identification implements Visitor<String,Object> {
                     } 
                     if ((((MemberDecl)decl).isStatic)) {
                         ref = new StaticRef((ClassDecl) table.retrieve(currentClass),
-                                (MemberDecl) decl, qr.posn);
+                                            (MemberDecl) decl, qr.posn);
                     } else {
                         ref = new MemberRef((MemberDecl) decl, qr.posn);
                     }

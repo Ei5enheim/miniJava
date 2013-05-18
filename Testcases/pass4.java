@@ -10,6 +10,9 @@ class A
 	
 		A[] b = new A[2];
 		b[0] = a.retFunc();
+                b = null;
+                if (b == null)
+                    System.out.println(5);
 
 	}
 	public boolean test (A a)

@@ -181,6 +181,7 @@ public class Checker implements Visitor<Object,Type>
         arrayLRef = false;
         isThisObjRef = false;
         type1 = stmt.ref.visit(this, null);
+
         if (isThisObjRef) {
             cond = true;
             reporter.reportError("Illegal start of type", "", stmt.posn);
@@ -735,8 +736,21 @@ public class Checker implements Visitor<Object,Type>
             if (checkArrayTypes(type1, type2)) {
                 return (true);
             }
+        } else if (isNullType(type1) || isNullType(type2)) {
+            return (true);
         }
         return false;
+    }
+
+    public boolean isNullType(Type type)
+    {
+        if (type.typeKind == TypeKind.CLASS)
+        {
+            ClassType type1 = (ClassType) type;
+            if (type1.className.equals("null"))
+                return (true);
+        }
+        return (false);
     }
 
     public boolean checkClassTypes (Type type1, Type type2)
